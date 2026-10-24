@@ -4,6 +4,7 @@ import static dev.jbaby.wicket.testkit.locator.Locator.locate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jbaby.wicket.testkit.fixtures.Headline;
+import dev.jbaby.wicket.testkit.fixtures.NoOpLink;
 import dev.jbaby.wicket.testkit.fixtures.ShopPage;
 import dev.jbaby.wicket.testkit.fixtures.UserPanel;
 import java.util.List;
@@ -64,6 +65,61 @@ class LocatorTests {
             assertThat(locate(UserPanel.class).all(user)).isEmpty();
             assertThat(paths(locate(Component.class).all(user))).containsExactly("user:name");
             assertThat(locate(Page.class).all(page)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("R2 refine by the component itself")
+    class RefineByTheComponentItself {
+
+        @Test
+        @DisplayName("R2.1 withId matches only components with that wicket:id")
+        void withIdMatchesTheWicketId() {
+            assertThat(paths(locate(Label.class).withId("customer").all(page))).containsExactly(
+                "orders:0:customer", "orders:1:customer", "orders:2:customer",
+                "table:1:customer", "table:2:customer", "table:3:customer");
+        }
+
+        @Test
+        @DisplayName("R2.2 withModelObject matches only components whose model object equals the argument")
+        void withModelObjectMatchesEqualModelObjects() {
+            assertThat(paths(locate(Label.class).withModelObject("ACME").all(page))).containsExactly(
+                "user:name", "orders:0:customer", "orders:2:customer",
+                "table:1:customer", "table:3:customer");
+            assertThat(paths(locate(Label.class).withModelObject(42).all(page)))
+                .containsExactly("orders:1:number");
+        }
+
+        @Test
+        @DisplayName("R2.3 visible matches only components that are visible in hierarchy")
+        void visibleMatchesOnlyComponentsVisibleInHierarchy() {
+            assertThat(paths(locate(Label.class).visible().all(page)))
+                .contains("title", "locked:hint", "orders:0:customer")
+                .doesNotContain("note", "closed:reason");
+        }
+
+        @Test
+        @DisplayName("R2.4 without visible, visible and invisible components match alike")
+        void withoutVisibleInvisibleComponentsMatchToo() {
+            assertThat(paths(locate(Label.class).all(page)))
+                .contains("title", "note", "closed:reason");
+        }
+
+        @Test
+        @DisplayName("R2.5 enabled matches only components that are enabled in hierarchy")
+        void enabledMatchesOnlyComponentsEnabledInHierarchy() {
+            assertThat(paths(locate(NoOpLink.class).enabled().all(page))).containsExactly("refresh");
+            assertThat(paths(locate(NoOpLink.class).all(page)))
+                .containsExactly("locked:unlock", "refresh", "archive");
+        }
+
+        @Test
+        @DisplayName("R2.6 matching matches only components that the predicate accepts")
+        void matchingMatchesWhatThePredicateAccepts() {
+            var startsWithH = locate(Label.class)
+                .matching(label -> label.getDefaultModelObjectAsString().startsWith("H"), "starts with H");
+
+            assertThat(paths(startsWithH.all(page))).containsExactly("closed:reason");
         }
     }
 }

@@ -60,7 +60,7 @@ public final class Locator<T extends Component> {
     /// @param id the `wicket:id`
     /// @return a new locator with this criterion added
     public Locator<T> withId(String id) {
-        throw new UnsupportedOperationException("not implemented yet");
+        return with(new Criterion.Id(id));
     }
 
     /// Narrows this locator down to components whose model object equals the given one.
@@ -74,7 +74,7 @@ public final class Locator<T extends Component> {
     /// @param modelObject the model object, compared with `equals`
     /// @return a new locator with this criterion added
     public Locator<T> withModelObject(Object modelObject) {
-        throw new UnsupportedOperationException("not implemented yet");
+        return with(new Criterion.ModelObject(modelObject));
     }
 
     /// Narrows this locator down to components that are visible in hierarchy: they and all
@@ -86,7 +86,7 @@ public final class Locator<T extends Component> {
     ///
     /// @return a new locator with this criterion added
     public Locator<T> visible() {
-        throw new UnsupportedOperationException("not implemented yet");
+        return with(new Criterion.Visible());
     }
 
     /// Narrows this locator down to components that are enabled in hierarchy: they and all
@@ -98,7 +98,7 @@ public final class Locator<T extends Component> {
     ///
     /// @return a new locator with this criterion added
     public Locator<T> enabled() {
-        throw new UnsupportedOperationException("not implemented yet");
+        return with(new Criterion.Enabled());
     }
 
     /// Narrows this locator down to components with an ancestor that the other locator matches.
@@ -142,7 +142,9 @@ public final class Locator<T extends Component> {
     /// @return a new locator with this criterion added
     /// @throws IllegalArgumentException if the description is blank
     public Locator<T> matching(Predicate<? super T> predicate, String description) {
-        throw new UnsupportedOperationException("not implemented yet");
+        @SuppressWarnings("unchecked") // matches() applies it to components of type T only
+        var anyComponent = (Predicate<Component>) predicate;
+        return with(new Criterion.Matching(anyComponent, description));
     }
 
     /// Finds the one component this locator matches.
@@ -187,6 +189,12 @@ public final class Locator<T extends Component> {
     /// @return whether any component matches
     public boolean existsIn(MarkupContainer root) {
         throw new UnsupportedOperationException("not implemented yet");
+    }
+
+    private Locator<T> with(Criterion criterion) {
+        var more = new ArrayList<>(criteria);
+        more.add(criterion);
+        return new Locator<>(type, List.copyOf(more));
     }
 
     /// Whether the component meets every criterion of this locator.
