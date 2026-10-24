@@ -59,6 +59,9 @@
 ///   component as not matching `withModelObject`.
 ///   _(why: under a `CompoundPropertyModel`, Wicket creates a model for any component without
 ///   one, and that model throws when the object has no property named like the component)_
+/// - R2.8 — Where `withModelObject` is given `null`, the locator shall match only components
+///   whose model object is `null`.
+///   _(why: a test can then find a field that was cleared)_
 ///
 /// ### R3: Refine by position
 /// - R3.1 — Where `inside` is given, the locator shall match only components with an ancestor
@@ -74,8 +77,8 @@
 /// - R4.2 — When a locator is refined, the locator shall return a new locator and leave the
 ///   original unchanged.
 ///   _(why: a page object can then keep base locators and refine them per test)_
-/// - R4.3 — If any method of a locator is given `null`, then the locator shall throw a
-///   `NullPointerException` that names the parameter.
+/// - R4.3 — If any method of a locator other than `withModelObject` is given `null`, then the
+///   locator shall throw a `NullPointerException` that names the parameter.
 /// - R4.4 — The locator shall read a component's model object, and apply a `matching`
 ///   predicate to it, only once the component has met the locator's type and all its other
 ///   criteria, whatever order the refinements were given in.
@@ -137,7 +140,7 @@
 ///
 /// | Missed criterion | What differs |
 /// |---|---|
-/// | type | `is a <class name>` |
+/// | type | `is a <class name>`, or `is an <class name>` before a vowel letter, as in R6.1 |
 /// | `visible` | `is not visible` |
 /// | `enabled` | `is not enabled` |
 /// | `inside` | `is not inside <the other locator's description>` |

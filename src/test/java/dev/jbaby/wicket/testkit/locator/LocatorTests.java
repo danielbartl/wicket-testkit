@@ -144,6 +144,20 @@ class LocatorTests {
         }
     }
 
+    @Nested
+    @DisplayName("R2 refine by the component itself, null")
+    class RefineByANullModelObject {
+
+        @Test
+        @DisplayName("R2.8 withModelObject(null) matches only components whose model object is null")
+        void withNullModelObjectMatchesNullModelObjects() {
+            assertThat(paths(locate(WebMarkupContainer.class).withId("closed").withModelObject(null).all(page)))
+                .containsExactly("closed");
+            assertThat(locate(Label.class).withModelObject(null).all(page)).isEmpty();
+            assertThat(locate(Label.class).withModelObject(null)).hasToString("a Label with model object null");
+        }
+    }
+
     /// A bean for a `CompoundPropertyModel`: it has a `name` property and nothing else.
     public static class Customer implements Serializable {
 
@@ -231,8 +245,6 @@ class LocatorTests {
             assertAll(
                 () -> assertThatNullPointerException().isThrownBy(() -> locate(null)).withMessageContaining("type"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.withId(null)).withMessageContaining("id"),
-                () -> assertThatNullPointerException().isThrownBy(() -> labels.withModelObject(null))
-                    .withMessageContaining("modelObject"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.inside(null))
                     .withMessageContaining("ancestor"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.inRowOf(null))

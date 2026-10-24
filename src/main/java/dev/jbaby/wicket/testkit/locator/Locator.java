@@ -75,12 +75,14 @@ public final class Locator<T extends Component> {
     /// locate(Label.class).withModelObject("ACME")
     /// ```
     ///
-    /// Only the model objects of components of this locator's type are read.
+    /// The model object is read only once a component met every other criterion; a model object
+    /// that can't be read doesn't match.
     ///
-    /// @param modelObject the model object, compared with `equals`
+    /// @param modelObject the model object, compared with `equals`; `null` matches components
+    ///     whose model object is `null`
     /// @return a new locator with this criterion added
     public Locator<T> withModelObject(Object modelObject) {
-        return with(new Criterion.ModelObject(notNull(modelObject, "modelObject")));
+        return with(new Criterion.ModelObject(modelObject));
     }
 
     /// Narrows this locator down to components that are visible in hierarchy: they and all
@@ -141,7 +143,7 @@ public final class Locator<T extends Component> {
     /// locate(TextField.class).matching(FormComponent::isRequired, "is required")
     /// ```
     ///
-    /// The predicate is applied only to components of this locator's type.
+    /// The predicate is applied only once a component met every other criterion.
     ///
     /// @param predicate the check a component has to pass
     /// @param description what the predicate checks, completing "a TextField that …"
@@ -246,7 +248,7 @@ public final class Locator<T extends Component> {
     /// criterion that throws.
     private Optional<FailureMessage.NearMiss> nearMiss(Component component) {
         var miss = type.isInstance(component) ? null
-            : new FailureMessage.NearMiss(component, "is a " + Words.className(component.getClass()), 0);
+            : new FailureMessage.NearMiss(component, "is " + Words.withArticle(Words.className(component.getClass())), 0);
         for (var criterion : criteria) {
             var met = (miss == null || !criterion.needsType()) && passes(criterion, component);
             if (!met) {

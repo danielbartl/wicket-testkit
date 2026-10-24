@@ -132,6 +132,8 @@ class FailureMessageTests {
     @Test
     @DisplayName("R7.5 each near miss says what differs, per missed criterion")
     void nearMissesSayWhatDiffers() {
+        assertThat(messageOf(locate(Label.class).withId("user"), page))
+            .contains("\n  - user (is an UserPanel)\n");
         assertThat(messageOf(locate(Label.class).withId("reason").visible(), page))
             .contains("\n  - closed:reason (is not visible)\n");
         assertThat(messageOf(locate(NoOpLink.class).withId("archive").enabled(), page))

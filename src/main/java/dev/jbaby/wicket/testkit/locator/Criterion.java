@@ -1,5 +1,6 @@
 package dev.jbaby.wicket.testkit.locator;
 
+import java.util.Objects;
 import java.util.function.Predicate;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
@@ -137,7 +138,7 @@ sealed interface Criterion {
         @Override
         public boolean test(Component component) {
             var actual = read(component);
-            return actual != UNREADABLE && modelObject.equals(actual);
+            return actual != UNREADABLE && Objects.equals(modelObject, actual);
         }
 
         @Override
