@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+<form wicket:id="order">
+    <input type="text" wicket:id="customer">
+    <div wicket:id="details"><select wicket:id="country"></select></div>
+    <div wicket:id="archived"><input type="text" wicket:id="note"> <select wicket:id="region"></select></div>
+    <div wicket:id="extra">
+        <input type="text" wicket:id="coupon"> <select wicket:id="gift"></select>
+        <input type="submit" wicket:id="apply" value="Apply">
+    </div>
+    <input type="submit" wicket:id="save" value="Save">
+    <input type="submit" wicket:id="saveAjax" value="Save with Ajax">
+    <a wicket:id="send">Send</a>
+</form>
+<p wicket:id="result"></p>
+<form wicket:id="search"><input type="text" wicket:id="query"></form>
+<form wicket:id="hidden"></form>
+</body>
+</html>

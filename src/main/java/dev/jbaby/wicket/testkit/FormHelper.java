@@ -1,7 +1,15 @@
 package dev.jbaby.wicket.testkit;
 
+import static dev.jbaby.wicket.testkit.WicketTestkit.check;
+import static dev.jbaby.wicket.testkit.WicketTestkit.notNull;
+import static dev.jbaby.wicket.testkit.WicketTestkit.prefix;
+import static dev.jbaby.wicket.testkit.WicketTestkit.requireVisible;
+
 import dev.jbaby.wicket.testkit.locator.Locator;
+import org.apache.wicket.Component;
+import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.FormComponent;
+import org.apache.wicket.util.tester.FormTester;
 
 /// Fills in and submits one form through a `FormTester`, with fields and buttons found by
 /// locators inside that form. [WicketTestkit#form(Locator)] creates it.
@@ -17,7 +25,16 @@ import org.apache.wicket.markup.html.form.FormComponent;
 /// [WicketTestkit#form(Locator)].
 public final class FormHelper {
 
-    private FormHelper() {
+    @SuppressWarnings("rawtypes")
+    private final Locator<? extends Form> formLocator;
+    private final Form<?> form;
+    private final FormTester formTester;
+
+    FormHelper(@SuppressWarnings("rawtypes") Locator<? extends Form> formLocator, Form<?> form,
+            FormTester formTester) {
+        this.formLocator = formLocator;
+        this.form = form;
+        this.formTester = formTester;
     }
 
     /// Sets a field's input, as `FormTester.setValue` does.
@@ -32,7 +49,10 @@ public final class FormHelper {
     /// @throws AssertionError also if the field is not enabled in hierarchy
     public FormHelper set(@SuppressWarnings("rawtypes") Locator<? extends FormComponent> field,
             String value) {
-        throw new UnsupportedOperationException("not implemented yet");
+        notNull(value, "value");
+        var located = locateUsable(notNull(field, "field"));
+        check(field, located, () -> formTester.setValue(located, value));
+        return this;
     }
 
     /// Selects the choice at an index, as `FormTester.select` does.
@@ -47,7 +67,11 @@ public final class FormHelper {
     /// @throws AssertionError also if the field is not enabled in hierarchy
     public FormHelper select(@SuppressWarnings("rawtypes") Locator<? extends FormComponent> field,
             int index) {
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locateUsable(notNull(field, "field"));
+        var formRelativePath = located.getPageRelativePath()
+            .substring(form.getPageRelativePath().length() + 1);
+        check(field, located, () -> formTester.select(formRelativePath, index));
+        return this;
     }
 
     /// Submits the form with the values set so far, as `FormTester.submit()` does.
@@ -56,7 +80,7 @@ public final class FormHelper {
     /// form.set(locate(TextField.class).withId("customer"), "ACME").submit();
     /// ```
     public void submit() {
-        throw new UnsupportedOperationException("not implemented yet");
+        check(formLocator, form, formTester::submit);
     }
 
     /// Submits the form through a button with the values set so far, as
@@ -70,6 +94,17 @@ public final class FormHelper {
     ///
     /// @param button the locator of the button, inside this form
     public void submit(Locator<?> button) {
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = requireVisible(button, notNull(button, "button").one(form));
+        check(button, located, () -> formTester.submit(located));
+    }
+
+    /// The one field the locator matches inside the form, which has to be visible and enabled in
+    /// hierarchy: Wicket ignores the input of any other field.
+    private Component locateUsable(Locator<?> field) {
+        var located = requireVisible(field, field.one(form));
+        if (!located.isEnabledInHierarchy()) {
+            throw new AssertionError(prefix(field, located) + "the component is not enabled in hierarchy");
+        }
+        return located;
     }
 }

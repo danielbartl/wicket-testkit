@@ -3,6 +3,7 @@ package dev.jbaby.wicket.testkit;
 import dev.jbaby.wicket.testkit.locator.Locator;
 import java.io.Serializable;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.apache.wicket.Component;
 import org.apache.wicket.Page;
 import org.apache.wicket.markup.html.basic.Label;
@@ -94,8 +95,9 @@ public final class WicketTestkit {
     /// @param form the locator of the form
     /// @return a helper that locates fields and buttons inside that form
     public FormHelper form(@SuppressWarnings("rawtypes") Locator<? extends Form> form) {
-        notNull(form, "form");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = (Form<?>) locateVisible(notNull(form, "form"));
+        var formTester = checked(form, located, () -> tester.newFormTester(located.getPageRelativePath()));
+        return new FormHelper(form, located, formTester);
     }
 
     /// Asserts a label's text, as `WicketTester.assertLabel` does.
@@ -268,7 +270,11 @@ public final class WicketTestkit {
     /// The one component the locator matches, which has to be visible in hierarchy, because
     /// WicketTester only looks up visible components by path.
     private Component locateVisible(Locator<?> locator) {
-        var component = locate(locator);
+        return requireVisible(locator, locate(locator));
+    }
+
+    /// The component, if it is visible in hierarchy.
+    static Component requireVisible(Locator<?> locator, Component component) {
         if (!component.isVisibleInHierarchy()) {
             throw new AssertionError(prefix(locator, component) + "the component is not visible in hierarchy");
         }
@@ -276,9 +282,17 @@ public final class WicketTestkit {
     }
 
     /// Runs a WicketTester check for the component and puts the prefix in front of its failure.
-    private static void check(Locator<?> locator, Component component, Runnable check) {
-        try {
+    static void check(Locator<?> locator, Component component, Runnable check) {
+        checked(locator, component, () -> {
             check.run();
+            return null;
+        });
+    }
+
+    /// Like [#check(Locator, Component, Runnable)], for a check that returns a result.
+    static <R> R checked(Locator<?> locator, Component component, Supplier<R> check) {
+        try {
+            return check.get();
         } catch (AssertionError failure) {
             throw new AssertionError(prefix(locator, component) + failure.getMessage(), failure);
         }
