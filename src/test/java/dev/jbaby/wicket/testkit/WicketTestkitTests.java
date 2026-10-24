@@ -18,6 +18,7 @@ import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.util.tester.WicketTester;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -302,6 +303,71 @@ class WicketTestkitTests {
                 .satisfies(failure -> assertThat(failure.getMessage().lines())
                     .hasSize(12)
                     .last().asString().matches("  - and \\d+ more"));
+        }
+    }
+
+    @Nested
+    @DisplayName("R7 failure messages")
+    class FailureMessages {
+
+        @Test
+        @DisplayName("R7.1 a WicketTester failure gets the locator's description and path in front, and stays the cause")
+        void wicketTesterFailuresGetThePrefix() {
+            var globex = locate(Label.class).withId("customer").inRowOf(Order.GLOBEX_42);
+            var frozen = locate(Link.class).withId("frozen");
+
+            assertThatThrownBy(() -> kit.assertLabel(globex, "ACME"))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessage("a Label with id \"customer\" in the row of Order[id=42, customer=Globex]"
+                    + " (at orders:1:customer): expected: <ACME> but was: <Globex>")
+                .cause().isInstanceOf(AssertionError.class).hasMessage("expected: <ACME> but was: <Globex>");
+            assertThatThrownBy(() -> kit.click(frozen))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessageStartingWith("a Link with id \"frozen\" (at frozen): The component is currently not enabled")
+                .cause().isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R7.2 any other exception passes through unchanged")
+        void otherExceptionsPassThrough() {
+            assertThatThrownBy(() -> kit.click(locate(Link.class).withId("boom")))
+                .isNotInstanceOf(AssertionError.class)
+                .satisfies(thrown -> assertThat(rootCause(thrown))
+                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .hasMessage("boom"));
+        }
+
+        static Throwable rootCause(Throwable thrown) {
+            var cause = thrown;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            return cause;
+        }
+
+        @Test
+        @DisplayName("R7.3 acting on or asserting about an invisible component fails with a message that says so")
+        void invisibleComponentsAreReported() {
+            var secret = locate(Label.class).withId("secret");
+            var open = locate(Link.class).withId("open");
+            var vaultFeedback = locate(FeedbackPanel.class).withId("vaultFeedback");
+
+            assertThatThrownBy(() -> kit.assertLabel(secret, "42"))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessage("a Label with id \"secret\" (at vault:secret): the component is not visible in hierarchy");
+            assertAll(
+                () -> assertInvisible(() -> kit.click(open)),
+                () -> assertInvisible(() -> kit.ajax(open, "click")),
+                () -> assertInvisible(() -> kit.assertModelObject(secret, "42")),
+                () -> assertInvisible(() -> kit.assertEnabled(open)),
+                () -> assertInvisible(() -> kit.assertDisabled(open)),
+                () -> assertInvisible(() -> kit.assertFeedback(vaultFeedback)));
+        }
+
+        static void assertInvisible(ThrowingCallable call) {
+            assertThatThrownBy(call)
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessageEndingWith("): the component is not visible in hierarchy");
         }
     }
 
