@@ -119,20 +119,23 @@
 /// - R7.3 — If the list of matches would have more than 10 lines, then the locator shall show
 ///   the first 10 and end the list with `  - and <k> more`.
 /// - R7.4 — Where a locator has at least two criteria and nothing matches, the locator shall
-///   add the line `Near misses (all criteria but one):` and list the near misses in tree order,
-///   one line `  - <path> (<what differs>)` each, at most 5, then `  - and <k> more`.
+///   add the line `Near misses (all criteria but one):` and list the near misses, one line
+///   `  - <path> (<what differs>)` each, at most 5, then `  - and <k> more`. It shall order
+///   them by the criterion they miss, as in the table below, and in tree order within each.
+///   _(why: a component of another type or hidden is the likelier culprit than one more
+///   component of the right type with another id)_
 /// - R7.5 — The locator shall say what differs for each criterion as the table below shows.
 ///
 /// | Missed criterion | What differs |
 /// |---|---|
 /// | type | `is a <class name>` |
-/// | `withId` | `has id "<id>"` |
-/// | `withModelObject` | `has model object <value>` |
 /// | `visible` | `is not visible` |
 /// | `enabled` | `is not enabled` |
-/// | `matching` | `does not match "<description>"` |
 /// | `inside` | `is not inside <the other locator's description>` |
 /// | `inRowOf` | `is not in the row of <value>` |
+/// | `withModelObject` | `has model object <value>` |
+/// | `matching` | `does not match "<description>"` |
+/// | `withId` | `has id "<id>"` |
 ///
 /// A complete message, for a page with two orders whose rows hold `customerName` labels:
 ///

@@ -3,8 +3,10 @@ package dev.jbaby.wicket.testkit.locator;
 import static java.util.stream.Collectors.joining;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.apache.wicket.Component;
@@ -168,7 +170,8 @@ public final class Locator<T extends Component> {
     public T one(MarkupContainer root) {
         var matches = all(root);
         if (matches.size() != 1) {
-            throw new AssertionError("Expected exactly one match, but found " + matches.size());
+            var nearMisses = matches.isEmpty() ? nearMisses(root) : List.<FailureMessage.NearMiss>of();
+            throw new AssertionError(FailureMessage.notExactlyOne(this, root, matches, nearMisses));
         }
         return matches.get(0);
     }
@@ -222,6 +225,35 @@ public final class Locator<T extends Component> {
     boolean matches(Component component) {
         return type.isInstance(component)
             && criteria.stream().allMatch(criterion -> criterion.test(component));
+    }
+
+    /// The components that meet every criterion but one, ordered by the missed criterion, then in
+    /// tree order. A locator with its type as the only criterion has none.
+    private List<FailureMessage.NearMiss> nearMisses(MarkupContainer root) {
+        var nearMisses = new ArrayList<FailureMessage.NearMiss>();
+        if (!criteria.isEmpty()) {
+            root.visitChildren((component, visit) -> nearMiss(component).ifPresent(nearMisses::add));
+            nearMisses.sort(Comparator.comparingInt(FailureMessage.NearMiss::order));
+        }
+        return nearMisses;
+    }
+
+    /// The near miss, if the component misses exactly one criterion. A criterion that needs the
+    /// type is not tested for a component of another type, and counts as missed.
+    private Optional<FailureMessage.NearMiss> nearMiss(Component component) {
+        var rightType = type.isInstance(component);
+        var miss = rightType ? null
+            : new FailureMessage.NearMiss(component, "is a " + Words.className(component.getClass()), 0);
+        for (var criterion : criteria) {
+            if ((!rightType && criterion.needsType()) || !criterion.test(component)) {
+                if (miss != null) {
+                    return Optional.empty();
+                }
+                miss = new FailureMessage.NearMiss(
+                    component, criterion.whatDiffers(component), criterion.nearMissOrder());
+            }
+        }
+        return Optional.ofNullable(miss);
     }
 
     /// Describes this locator's criteria in plain words, as failure messages show them.

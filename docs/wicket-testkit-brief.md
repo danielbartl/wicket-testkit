@@ -196,6 +196,7 @@ Settled in the M1 spec review on 2026-10-24, after checking the Wicket 10.11 sou
 | D9 | Names | `assertModelObject` (like `withModelObject`), `ajax(locator, event)` (locator first, like every other method), `FormHelper`. |
 | D10 | Context in delegated failures | **Wrap** WicketTester's `AssertionError` with the locator's description and path, keeping it as the cause. This gives up the IDE's expected/actual diff for `assertLabel` and `assertModelObject`. |
 | D11 | Commits per requirement group | **Accepted** that `SpecTraceabilityTests` stays red until the last group (M5) has its tests. |
+| D12 | Order of near misses (M3) | **By the criterion they miss**: type, visible, enabled, inside, inRowOf, withModelObject, matching, withId; tree order within each. In tree order alone, the labels with other ids crowded out the telling hints. |
 
 ## Prior art and credit
 
