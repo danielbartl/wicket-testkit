@@ -7,10 +7,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.CounterPanel;
+import dev.jbaby.wicket.testkit.fixtures.Order;
 import dev.jbaby.wicket.testkit.fixtures.OrdersPage;
 import dev.jbaby.wicket.testkit.locator.Locator;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.AfterEach;
@@ -123,6 +125,38 @@ class WicketTestkitTests {
                     .withMessageContaining("locator"),
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.pathOf(null))
                     .withMessageContaining("locator"));
+        }
+    }
+
+    @Nested
+    @DisplayName("R2 exactly one")
+    class ExactlyOne {
+
+        @Test
+        @DisplayName("R2.1 a locator that matches no component or several fails with the locator's AssertionError")
+        void failsUnlessExactlyOneMatches() {
+            assertThatThrownBy(() -> kit.click(locate(Link.class).withId("missing")))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessageStartingWith(
+                    "Expected exactly one match for a Link with id \"missing\" in OrdersPage, but found none.");
+            assertThatThrownBy(() -> kit.assertLabel(locate(Label.class).withId("customer"), "ACME"))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessageStartingWith(
+                    "Expected exactly one match for a Label with id \"customer\" in OrdersPage, but found 3:");
+        }
+    }
+
+    @Nested
+    @DisplayName("R8 path for other WicketTester methods")
+    class PathForOtherWicketTesterMethods {
+
+        @Test
+        @DisplayName("R8.1 pathOf returns the page-relative path, which the tester's own methods accept")
+        void pathOfReturnsThePageRelativePath() {
+            var customer = locate(Label.class).withId("customer").inRowOf(Order.GLOBEX_42);
+
+            assertThat(kit.pathOf(customer)).isEqualTo("orders:1:customer");
+            tester.assertLabel(kit.pathOf(customer), "Globex");
         }
     }
 }
