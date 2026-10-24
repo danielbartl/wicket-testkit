@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
+import org.apache.wicket.util.visit.IVisit;
 
 /// Finds Wicket components by what they are instead of by their path: their type, `wicket:id`,
 /// model object, state and position.
@@ -162,8 +163,11 @@ public final class Locator<T extends Component> {
     /// @throws AssertionError if no component or several match; the message names the criteria,
     ///     what was found and the near misses
     public T one(MarkupContainer root) {
-        notNull(root, "root");
-        throw new UnsupportedOperationException("not implemented yet");
+        var matches = all(root);
+        if (matches.size() != 1) {
+            throw new AssertionError("Expected exactly one match, but found " + matches.size());
+        }
+        return matches.get(0);
     }
 
     /// Finds every component this locator matches.
@@ -193,8 +197,12 @@ public final class Locator<T extends Component> {
     /// @param root the page or container to search, not a candidate itself
     /// @return whether any component matches
     public boolean existsIn(MarkupContainer root) {
-        notNull(root, "root");
-        throw new UnsupportedOperationException("not implemented yet");
+        Boolean found = notNull(root, "root").visitChildren((Component component, IVisit<Boolean> visit) -> {
+            if (matches(component)) {
+                visit.stop(true);
+            }
+        });
+        return found != null;
     }
 
     private Locator<T> with(Criterion criterion) {

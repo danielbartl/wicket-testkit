@@ -4,6 +4,7 @@ import static dev.jbaby.wicket.testkit.locator.Locator.locate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.Headline;
@@ -245,6 +246,50 @@ class LocatorTests {
 
             assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, ""));
             assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, "  "));
+        }
+    }
+
+    @Nested
+    @DisplayName("R5 resolve")
+    class Resolve {
+
+        @Test
+        @DisplayName("R5.1 one returns the component when exactly one matches")
+        void oneReturnsTheOnlyMatch() {
+            Label title = locate(Label.class).withId("title").one(page);
+
+            assertThat(title).isSameAs(page.get("title"));
+        }
+
+        @Test
+        @DisplayName("R5.2 one throws an AssertionError when nothing matches")
+        void oneFailsWithoutAMatch() {
+            assertThatThrownBy(() -> locate(Label.class).withId("missing").one(page))
+                .isExactlyInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.3 one throws an AssertionError when several components match")
+        void oneFailsWithSeveralMatches() {
+            assertThatThrownBy(() -> locate(Label.class).withId("customer").one(page))
+                .isExactlyInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.4 all returns every match in tree order, or an empty list")
+        void allReturnsEveryMatchInTreeOrder() {
+            assertThat(paths(locate(Component.class).all(page))).startsWith(
+                "title", "headline", "note", "closed", "closed:reason",
+                "locked", "locked:hint", "locked:unlock", "refresh");
+            assertThat(locate(Label.class).withId("missing").all(page)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("R5.5 existsIn tells whether at least one component matches")
+        void existsInTellsWhetherAnythingMatches() {
+            assertThat(locate(Label.class).withId("customer").existsIn(page)).isTrue();
+            assertThat(locate(Label.class).withId("title").existsIn(page)).isTrue();
+            assertThat(locate(Label.class).withId("missing").existsIn(page)).isFalse();
         }
     }
 }
