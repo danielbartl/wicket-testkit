@@ -119,6 +119,17 @@ class FailureMessageTests {
     }
 
     @Test
+    @DisplayName("R7.6 a criterion that throws while near misses are looked for counts as missed")
+    void throwingCriteriaCountAsMissed() {
+        var exploding = locate(UserPanel.class).matching(panel -> {
+            throw new IllegalStateException("must not escape");
+        }, "explodes");
+
+        assertThat(messageOf(locate(Label.class).withId("missing").inside(exploding), page))
+            .startsWith("Expected exactly one match for a Label with id \"missing\" inside an UserPanel that explodes");
+    }
+
+    @Test
     @DisplayName("R7.5 each near miss says what differs, per missed criterion")
     void nearMissesSayWhatDiffers() {
         assertThat(messageOf(locate(Label.class).withId("reason").visible(), page))

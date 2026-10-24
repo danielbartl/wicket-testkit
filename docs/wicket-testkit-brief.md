@@ -198,6 +198,19 @@ Settled in the M1 spec review on 2026-10-24, after checking the Wicket 10.11 sou
 | D11 | Commits per requirement group | **Accepted** that `SpecTraceabilityTests` stays red until the last group (M5) has its tests. |
 | D12 | Order of near misses (M3) | **By the criterion they miss**: type, visible, enabled, inside, inRowOf, withModelObject, matching, withId; tree order within each. In tree order alone, the labels with other ids crowded out the telling hints. |
 
+Settled after the code review of M0 to M6, on 2026-10-24.
+
+| | Decision | Outcome |
+|---|---|---|
+| D13 | Bugs the review found | **Fixed.** `submit(button)` needs an enabled button. Model objects and predicates are evaluated last, whatever order they were given in, and the near-miss search never throws. A model object that can't be read (for example under a `CompoundPropertyModel`) doesn't match. |
+| D14 | Articles in near misses | **`is an AjaxLink`**, by the same a/an rule as descriptions. `an UserPanel` stays. |
+| D15 | `null` model objects | **Allowed** in `withModelObject` and as the expected value of `assertModelObject`, so tests can assert a cleared field. |
+| D16 | IDE diff for delegated failures | **Kept.** Revises D3 and D10: when WicketTester throws opentest4j's `AssertionFailedError`, the testkit throws one too, with the locator in front and the same expected and actual values. opentest4j comes with wicket-tester anyway; it is declared `provided`. The testkit's own failures stay plain `AssertionError`s. |
+| D17 | Getting the located component | **`kit.one(locator)`**, typed, with the "no page rendered yet" check. |
+| D18 | Forms | One form helper per form and request: `form` returns the same helper until the tester handles another request, and a helper fails once it has. `select` fails on a field with a `FormComponentUpdatingBehavior`. New: `FormHelper.ajax(field, event)`, which sends the values set so far, and `FormHelper.formTester()` as a way out. |
+| D19 | Rows of entities without value-based `equals` | **`inRowOf(type, predicate, description)`**. |
+| D20 | Rejected | `locate(Class<? super T>)` to avoid raw types: inference fails in arguments and chains, so the raw bounds stay. A public formatter for `assertCount`'s list: it would widen the API, and the R6.2 test pins the format. |
+
 ## Prior art and credit
 
 - **otto-de/enhanced-wickettester** (Apache 2.0, archived; last commit 2018, Wicket 7). Same core

@@ -131,9 +131,13 @@ sealed interface Criterion {
 
     record ModelObject(Object modelObject) implements Criterion {
 
+        /// Stands for a model object that could not be read.
+        private static final Object UNREADABLE = new Object();
+
         @Override
         public boolean test(Component component) {
-            return modelObject.equals(component.getDefaultModelObject());
+            var actual = read(component);
+            return actual != UNREADABLE && modelObject.equals(actual);
         }
 
         @Override
@@ -143,7 +147,18 @@ sealed interface Criterion {
 
         @Override
         public String whatDiffers(Component component) {
-            return "has model object " + Words.value(component.getDefaultModelObject());
+            var actual = read(component);
+            return actual == UNREADABLE ? "has a model object that cannot be read"
+                : "has model object " + Words.value(actual);
+        }
+
+        /// The component's model object, or `UNREADABLE` if reading it throws.
+        private static Object read(Component component) {
+            try {
+                return component.getDefaultModelObject();
+            } catch (RuntimeException e) {
+                return UNREADABLE;
+            }
         }
 
         @Override

@@ -211,9 +211,12 @@ public final class Locator<T extends Component> {
         return found != null;
     }
 
+    /// A copy with one more criterion. Criteria that read the model object or run a predicate go
+    /// last, so they only see components that met everything else.
     private Locator<T> with(Criterion criterion) {
         var more = new ArrayList<>(criteria);
         more.add(criterion);
+        more.sort(Comparator.comparing(Criterion::needsType));
         return new Locator<>(type, List.copyOf(more));
     }
 
@@ -238,14 +241,15 @@ public final class Locator<T extends Component> {
         return nearMisses;
     }
 
-    /// The near miss, if the component misses exactly one criterion. A criterion that needs the
-    /// type is not tested for a component of another type, and counts as missed.
+    /// The near miss, if the component misses exactly one criterion. Once it missed one, the
+    /// criteria that need the type and all others are not tested, and count as missed; so does a
+    /// criterion that throws.
     private Optional<FailureMessage.NearMiss> nearMiss(Component component) {
-        var rightType = type.isInstance(component);
-        var miss = rightType ? null
+        var miss = type.isInstance(component) ? null
             : new FailureMessage.NearMiss(component, "is a " + Words.className(component.getClass()), 0);
         for (var criterion : criteria) {
-            if ((!rightType && criterion.needsType()) || !criterion.test(component)) {
+            var met = (miss == null || !criterion.needsType()) && passes(criterion, component);
+            if (!met) {
                 if (miss != null) {
                     return Optional.empty();
                 }
@@ -254,6 +258,14 @@ public final class Locator<T extends Component> {
             }
         }
         return Optional.ofNullable(miss);
+    }
+
+    private static boolean passes(Criterion criterion, Component component) {
+        try {
+            return criterion.test(component);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /// Describes this locator's criteria in plain words, as failure messages show them.

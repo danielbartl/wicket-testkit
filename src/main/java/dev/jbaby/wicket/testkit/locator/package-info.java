@@ -55,6 +55,10 @@
 ///   enabled in hierarchy.
 /// - R2.6 — Where `matching` is given, the locator shall match only components that the
 ///   predicate accepts.
+/// - R2.7 — If reading a component's model object throws, then the locator shall treat the
+///   component as not matching `withModelObject`.
+///   _(why: under a `CompoundPropertyModel`, Wicket creates a model for any component without
+///   one, and that model throws when the object has no property named like the component)_
 ///
 /// ### R3: Refine by position
 /// - R3.1 — Where `inside` is given, the locator shall match only components with an ancestor
@@ -72,9 +76,11 @@
 ///   _(why: a page object can then keep base locators and refine them per test)_
 /// - R4.3 — If any method of a locator is given `null`, then the locator shall throw a
 ///   `NullPointerException` that names the parameter.
-/// - R4.4 — The locator shall read the model object of, and apply the `matching` predicate
-///   to, only components of its type.
-///   _(why: models of unrelated components may load data or fail outside their own page)_
+/// - R4.4 — The locator shall read a component's model object, and apply a `matching`
+///   predicate to it, only once the component has met the locator's type and all its other
+///   criteria, whatever order the refinements were given in.
+///   _(why: models of unrelated components may load data or fail outside their own page, and a
+///   predicate may only make sense for the components it was written for)_
 /// - R4.5 — If `matching` is given a blank description, then the locator shall throw an
 ///   `IllegalArgumentException`.
 ///   _(why: the description is what failure messages show)_
@@ -125,6 +131,9 @@
 ///   _(why: a component of another type or hidden is the likelier culprit than one more
 ///   component of the right type with another id)_
 /// - R7.5 — The locator shall say what differs for each criterion as the table below shows.
+/// - R7.6 — If evaluating a criterion throws while the locator looks for near misses, then the
+///   locator shall count that criterion as missed.
+///   _(why: a failure message must not fail itself)_
 ///
 /// | Missed criterion | What differs |
 /// |---|---|
@@ -133,7 +142,7 @@
 /// | `enabled` | `is not enabled` |
 /// | `inside` | `is not inside <the other locator's description>` |
 /// | `inRowOf` | `is not in the row of <value>` |
-/// | `withModelObject` | `has model object <value>` |
+/// | `withModelObject` | `has model object <value>`, or `has a model object that cannot be read` |
 /// | `matching` | `does not match "<description>"` |
 /// | `withId` | `has id "<id>"` |
 ///

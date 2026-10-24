@@ -12,6 +12,7 @@ import dev.jbaby.wicket.testkit.fixtures.NoOpLink;
 import dev.jbaby.wicket.testkit.fixtures.Order;
 import dev.jbaby.wicket.testkit.fixtures.ShopPage;
 import dev.jbaby.wicket.testkit.fixtures.UserPanel;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.wicket.Component;
@@ -20,6 +21,7 @@ import org.apache.wicket.Page;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.AfterEach;
@@ -130,6 +132,30 @@ class LocatorTests {
 
             assertThat(paths(startsWithH.all(page))).containsExactly("closed:reason");
         }
+
+        @Test
+        @DisplayName("R2.7 a component whose model object cannot be read does not match withModelObject")
+        void unreadableModelObjectsDoNotMatch() {
+            var root = new WebMarkupContainer("root", new CompoundPropertyModel<>(new Customer("ACME")));
+            root.add(new Label("name"));
+            root.add(new WebMarkupContainer("box"));
+
+            assertThat(paths(locate(Component.class).withModelObject("ACME").all(root))).containsExactly("name");
+        }
+    }
+
+    /// A bean for a `CompoundPropertyModel`: it has a `name` property and nothing else.
+    public static class Customer implements Serializable {
+
+        private final String name;
+
+        Customer(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
     }
 
     @Nested
@@ -222,16 +248,23 @@ class LocatorTests {
         }
 
         @Test
-        @DisplayName("R4.4 model objects are read and predicates applied only for components of the locator's type")
-        void otherTypesAreNotAskedForTheirModel() {
+        @DisplayName("R4.4 model objects are read and predicates applied only once the type and all other criteria are met")
+        void modelsAndPredicatesComeLast() {
             var root = new WebMarkupContainer("root");
             root.add(new WebMarkupContainer("broken", failingModel()));
+            root.add(new Label("brokenLabel", failingModel()));
             root.add(new Label("customer", "ACME"));
             var seen = new ArrayList<Component>();
+            var seenWhenGivenFirst = new ArrayList<Component>();
 
-            assertThat(paths(locate(Label.class).withModelObject("ACME").all(root))).containsExactly("customer");
-            locate(Label.class).matching(seen::add, "is recorded").all(root);
-            assertThat(seen).hasSize(1).allMatch(Label.class::isInstance);
+            assertThat(paths(locate(Label.class).withId("customer").withModelObject("ACME").all(root)))
+                .containsExactly("customer");
+            assertThat(paths(locate(Label.class).withModelObject("ACME").withId("customer").all(root)))
+                .containsExactly("customer");
+            locate(Label.class).withId("customer").matching(seen::add, "is recorded").all(root);
+            locate(Label.class).matching(seenWhenGivenFirst::add, "is recorded").withId("customer").all(root);
+            assertThat(paths(seen)).containsExactly("customer");
+            assertThat(paths(seenWhenGivenFirst)).containsExactly("customer");
         }
 
         static IModel<String> failingModel() {
