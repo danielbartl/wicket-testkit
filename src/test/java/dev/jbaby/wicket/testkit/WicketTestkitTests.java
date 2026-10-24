@@ -11,6 +11,7 @@ import dev.jbaby.wicket.testkit.fixtures.Order;
 import dev.jbaby.wicket.testkit.fixtures.OrderPage;
 import dev.jbaby.wicket.testkit.fixtures.OrdersPage;
 import dev.jbaby.wicket.testkit.locator.Locator;
+import org.apache.wicket.Component;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
@@ -268,6 +269,39 @@ class WicketTestkitTests {
 
             assertThatThrownBy(() -> kit.assertOnAjaxResponse(
                 locate(Label.class).withId("status").inRowOf(Order.ACME_41))).isInstanceOf(AssertionError.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("R6 count")
+    class Count {
+
+        @Test
+        @DisplayName("R6.1 assertCount passes when exactly that many components match, zero included")
+        void assertCountPassesOnTheRightNumber() {
+            kit.assertCount(locate(Label.class).withId("customer"), 3);
+            kit.assertCount(locate(Label.class).withId("missing"), 0);
+            kit.assertCount(locate(Link.class).withId("open").visible(), 0);
+        }
+
+        @Test
+        @DisplayName("R6.2 assertCount fails on another number, with the expected and found matches")
+        void assertCountFailsOnAnotherNumber() {
+            assertThatThrownBy(() -> kit.assertCount(locate(Label.class).withId("customer"), 2))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessage("""
+                    Expected 2 matches for a Label with id "customer" in OrdersPage, but found 3:
+                      - orders:0:customer
+                      - orders:1:customer
+                      - orders:2:customer""");
+            assertThatThrownBy(() -> kit.assertCount(locate(Label.class).withId("missing"), 1))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessage("Expected 1 match for a Label with id \"missing\" in OrdersPage, but found none.");
+            assertThatThrownBy(() -> kit.assertCount(locate(Component.class), 1))
+                .isExactlyInstanceOf(AssertionError.class)
+                .satisfies(failure -> assertThat(failure.getMessage().lines())
+                    .hasSize(12)
+                    .last().asString().matches("  - and \\d+ more"));
         }
     }
 

@@ -30,6 +30,9 @@ import org.apache.wicket.util.tester.WicketTesterHelper;
 /// component was found, its path.
 public final class WicketTestkit {
 
+    /// How many matches a failure message lists, as the locator's own messages do.
+    private static final int MAX_MATCHES = 10;
+
     private final WicketTester tester;
 
     private WicketTestkit(WicketTester tester) {
@@ -214,8 +217,25 @@ public final class WicketTestkit {
     /// @param expected how many components it should match, zero included
     public void assertCount(Locator<?> locator, int expected) {
         notNull(locator, "locator");
-        page();
-        throw new UnsupportedOperationException("not implemented yet");
+        var page = page();
+        var matches = locator.all(page);
+        if (matches.size() == expected) {
+            return;
+        }
+        var message = new StringBuilder("Expected ").append(expected).append(expected == 1 ? " match" : " matches")
+            .append(" for ").append(locator).append(" in ").append(className(page.getClass()))
+            .append(", but found ");
+        if (matches.isEmpty()) {
+            message.append("none.");
+        } else {
+            message.append(matches.size()).append(':');
+            matches.stream().limit(MAX_MATCHES)
+                .forEach(match -> message.append("\n  - ").append(match.getPageRelativePath()));
+            if (matches.size() > MAX_MATCHES) {
+                message.append("\n  - and ").append(matches.size() - MAX_MATCHES).append(" more");
+            }
+        }
+        throw new AssertionError(message.toString());
     }
 
     /// Returns the page-relative path of the component a locator finds, for any `WicketTester`
@@ -267,6 +287,16 @@ public final class WicketTestkit {
     /// The locator's description and the component's path, to start a failure message with.
     static String prefix(Locator<?> locator, Component component) {
         return locator + " (at " + component.getPageRelativePath() + "): ";
+    }
+
+    /// The simple name of the class, or of its nearest named superclass if it is anonymous, as
+    /// the locator's messages name classes.
+    private static String className(Class<?> type) {
+        var named = type;
+        while (named.isAnonymousClass()) {
+            named = named.getSuperclass();
+        }
+        return named.getSimpleName();
     }
 
     static <V> V notNull(V value, String parameter) {
