@@ -54,9 +54,11 @@ ordersPage.rowOf(order).assertCustomer("ACME");
 4. **Exactly one by default.** A locator used for an action or an assertion must match exactly one
    component. Anything else fails with a message that says what was searched and what was found.
 5. **Framework-agnostic.** Failures are plain `java.lang.AssertionError`. No JUnit, TestNG,
-   Hamcrest or AssertJ in main code.
+   Hamcrest or AssertJ in main code. (WicketTester's own failures keep opentest4j's
+   `AssertionFailedError`, see D16.)
 6. **Minimal dependencies.** Only `wicket-core` and `wicket-tester`, both in `provided` scope, so
-   the consumer's Wicket version wins.
+   the consumer's Wicket version wins. (Plus opentest4j, `provided`, which wicket-tester brings
+   anyway, see D16.)
 7. **Small API with familiar words.** "Locator" is borrowed from Playwright, so developers and AI
    agents recognise the concept. When in doubt, leave a method out.
 

@@ -4,6 +4,7 @@ import static dev.jbaby.wicket.testkit.locator.Locator.locate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.CounterPanel;
@@ -19,6 +20,7 @@ import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.util.tester.WicketTester;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.opentest4j.AssertionFailedError;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -82,6 +84,9 @@ class WicketTestkitTests {
                 assertThatThrownBy(() -> freshKit.assertCount(locate(Label.class), 0))
                     .isExactlyInstanceOf(AssertionError.class)
                     .hasMessage("The tester has not rendered a page yet.");
+                assertThatThrownBy(() -> freshKit.one(locate(Label.class)))
+                    .isExactlyInstanceOf(AssertionError.class)
+                    .hasMessage("The tester has not rendered a page yet.");
             } finally {
                 fresh.destroy();
             }
@@ -116,8 +121,6 @@ class WicketTestkitTests {
                     .withMessageContaining("component"),
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.assertModelObject(null, "Orders"))
                     .withMessageContaining("component"),
-                () -> assertThatNullPointerException().isThrownBy(() -> kit.assertModelObject(label, null))
-                    .withMessageContaining("expected"),
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.assertFeedback(null, "Shipped"))
                     .withMessageContaining("panel"),
                 () -> assertThatNullPointerException()
@@ -128,6 +131,8 @@ class WicketTestkitTests {
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.assertCount(null, 1))
                     .withMessageContaining("locator"),
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.pathOf(null))
+                    .withMessageContaining("locator"),
+                () -> assertThatNullPointerException().isThrownBy(() -> kit.one(null))
                     .withMessageContaining("locator"));
         }
     }
@@ -250,6 +255,14 @@ class WicketTestkitTests {
         }
 
         @Test
+        @DisplayName("R5.9 assertModelObject with null checks that the model object is null")
+        void assertModelObjectWithNullChecksForNull() {
+            kit.assertModelObject(locate(WebMarkupContainer.class).withId("bump"), null);
+
+            assertThatThrownBy(() -> kit.assertModelObject(title, null)).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
         @DisplayName("R5.7 assertFeedback checks the feedback panel's messages as WicketTester.assertFeedback does")
         void assertFeedbackChecksTheMessages() {
             var feedback = locate(FeedbackPanel.class).visible();
@@ -317,7 +330,7 @@ class WicketTestkitTests {
             var frozen = locate(Link.class).withId("frozen");
 
             assertThatThrownBy(() -> kit.assertLabel(globex, "ACME"))
-                .isExactlyInstanceOf(AssertionError.class)
+                .isInstanceOf(AssertionError.class)
                 .hasMessage("a Label with id \"customer\" in the row of Order[id=42, customer=Globex]"
                     + " (at orders:1:customer): expected: <ACME> but was: <Globex>")
                 .cause().isInstanceOf(AssertionError.class).hasMessage("expected: <ACME> but was: <Globex>");
@@ -325,6 +338,18 @@ class WicketTestkitTests {
                 .isExactlyInstanceOf(AssertionError.class)
                 .hasMessageStartingWith("a Link with id \"frozen\" (at frozen): The component is currently not enabled")
                 .cause().isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R7.4 an AssertionFailedError from WicketTester comes back as one, with its expected and actual values")
+        void assertionFailedErrorsKeepExpectedAndActual() {
+            var globex = locate(Label.class).withId("customer").inRowOf(Order.GLOBEX_42);
+
+            var failure = catchThrowableOfType(AssertionFailedError.class, () -> kit.assertLabel(globex, "ACME"));
+
+            assertThat(failure).hasMessageStartingWith("a Label with id \"customer\"");
+            assertThat(failure.getExpected().getEphemeralValue()).isEqualTo("ACME");
+            assertThat(failure.getActual().getEphemeralValue()).isEqualTo("Globex");
         }
 
         @Test
@@ -372,8 +397,8 @@ class WicketTestkitTests {
     }
 
     @Nested
-    @DisplayName("R8 path for other WicketTester methods")
-    class PathForOtherWicketTesterMethods {
+    @DisplayName("R8 hand over to code the testkit doesn't wrap")
+    class HandOver {
 
         @Test
         @DisplayName("R8.1 pathOf returns the page-relative path, which the tester's own methods accept")
@@ -382,6 +407,14 @@ class WicketTestkitTests {
 
             assertThat(kit.pathOf(customer)).isEqualTo("orders:1:customer");
             tester.assertLabel(kit.pathOf(customer), "Globex");
+        }
+
+        @Test
+        @DisplayName("R8.2 one returns the located component, typed as the locator's type")
+        void oneReturnsTheTypedComponent() {
+            Label title = kit.one(locate(Label.class).withId("title"));
+
+            assertThat(title).isSameAs(tester.getComponentFromLastRenderedPage("title"));
         }
     }
 }

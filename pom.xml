@@ -43,6 +43,8 @@
 		<wicket.version>10.11.0</wicket.version>
 		<!-- The servlet API version Wicket 10 is built against -->
 		<jakarta.servlet-api.version>6.0.0</jakarta.servlet-api.version>
+		<!-- The version JUnit, and with it wicket-tester, brings along -->
+		<opentest4j.version>1.3.0</opentest4j.version>
 		<junit.version>6.1.3</junit.version>
 		<assertj.version>3.27.7</assertj.version>
 		<archunit.version>1.5.1</archunit.version>
@@ -85,6 +87,14 @@
 			<groupId>org.apache.wicket</groupId>
 			<artifactId>wicket-tester</artifactId>
 			<version>${wicket.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- WicketTester's assertions throw its AssertionFailedError, which the testkit passes on
+		     with expected and actual intact; wicket-tester brings it through JUnit -->
+		<dependency>
+			<groupId>org.opentest4j</groupId>
+			<artifactId>opentest4j</artifactId>
+			<version>${opentest4j.version}</version>
 			<scope>provided</scope>
 		</dependency>
 

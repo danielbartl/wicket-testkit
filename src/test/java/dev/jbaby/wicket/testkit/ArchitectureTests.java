@@ -35,11 +35,12 @@ class ArchitectureTests {
     }
 
     @Test
-    @DisplayName("main code depends on the JDK and Wicket only")
-    void mainCodeDependsOnTheJdkAndWicketOnly() {
+    @DisplayName("main code depends on the JDK, Wicket and opentest4j only")
+    void mainCodeDependsOnTheJdkWicketAndOpentest4jOnly() {
         classes().should().onlyDependOnClassesThat()
-            .resideInAnyPackage("java..", "org.apache.wicket..", BASE + "..")
-            .because("main code must not use JUnit, TestNG, Hamcrest, AssertJ or anything else")
+            .resideInAnyPackage("java..", "org.apache.wicket..", "org.opentest4j..", BASE + "..")
+            .because("main code must not use JUnit, TestNG, Hamcrest, AssertJ or anything else;"
+                + " opentest4j comes with wicket-tester, whose assertions throw its AssertionFailedError")
             .check(MAIN);
     }
 

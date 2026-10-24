@@ -13,6 +13,8 @@ import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.util.tester.WicketTester;
 import org.apache.wicket.util.tester.WicketTesterHelper;
+import org.opentest4j.AssertionFailedError;
+import org.opentest4j.ValueWrapper;
 
 /// Acts on and asserts about the components that locators find, through a `WicketTester` the
 /// test already has.
@@ -30,7 +32,8 @@ import org.apache.wicket.util.tester.WicketTesterHelper;
 /// ```
 ///
 /// Every failure is an `AssertionError` whose message names the locator's criteria and, once a
-/// component was found, its path.
+/// component was found, its path. When a `WicketTester` assertion fails with expected and actual
+/// values, they are kept, so IDEs can show their diff.
 public final class WicketTestkit {
 
     /// How many matches a failure message lists, as the locator's own messages do.
@@ -184,9 +187,9 @@ public final class WicketTestkit {
     /// ```
     ///
     /// @param component the locator of the component
-    /// @param expected the model object it should have, compared with `equals`
+    /// @param expected the model object it should have, compared with `equals`; `null` asserts
+    ///     that it has none
     public void assertModelObject(Locator<?> component, Object expected) {
-        notNull(expected, "expected");
         var located = locateVisible(notNull(component, "component"));
         check(component, located, () -> tester.assertModelValue(located.getPageRelativePath(), expected));
     }
@@ -252,6 +255,20 @@ public final class WicketTestkit {
         throw new AssertionError(message.toString());
     }
 
+    /// Returns the component a locator finds, for any check this class doesn't wrap.
+    ///
+    /// ```java
+    /// TextField<?> customer = kit.one(locate(TextField.class).withId("customer"));
+    /// assertThat(customer.isRequired()).isTrue();
+    /// ```
+    ///
+    /// @param locator the locator
+    /// @param <T> the type of the component
+    /// @return the component, typed as the locator's type
+    public <T extends Component> T one(Locator<T> locator) {
+        return notNull(locator, "locator").one(page());
+    }
+
     /// Returns the page-relative path of the component a locator finds, for any `WicketTester`
     /// method this class doesn't wrap.
     ///
@@ -310,13 +327,26 @@ public final class WicketTestkit {
         });
     }
 
-    /// Like [#check(Locator, Component, Runnable)], for a check that returns a result.
+    /// Like [#check(Locator, Component, Runnable)], for a check that returns a result. An
+    /// `AssertionFailedError` comes back as one, with its expected and actual values, so IDEs
+    /// can show their diff.
     static <R> R checked(Locator<?> locator, Component component, Supplier<R> check) {
         try {
             return check.get();
+        } catch (AssertionFailedError failure) {
+            var message = prefix(locator, component) + failure.getMessage();
+            if (failure.isExpectedDefined() || failure.isActualDefined()) {
+                throw new AssertionFailedError(message, value(failure.getExpected()), value(failure.getActual()),
+                    failure);
+            }
+            throw new AssertionFailedError(message, failure);
         } catch (AssertionError failure) {
             throw new AssertionError(prefix(locator, component) + failure.getMessage(), failure);
         }
+    }
+
+    private static Object value(ValueWrapper wrapper) {
+        return wrapper == null ? null : wrapper.getEphemeralValue();
     }
 
     /// The locator's description and the component's path, to start a failure message with.

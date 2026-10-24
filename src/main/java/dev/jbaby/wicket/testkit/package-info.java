@@ -27,6 +27,8 @@
 /// - `count`: assert how many components match (`WicketTestkit.assertCount`)
 /// - `get-path`: the page-relative path, for any WicketTester method the testkit doesn't wrap
 ///   (`WicketTestkit.pathOf`)
+/// - `get-component`: the located component, for any check the testkit doesn't wrap
+///   (`WicketTestkit.one`)
 ///
 /// ## Terms
 /// - **located component**: the one component that a locator matches in the last rendered
@@ -46,8 +48,9 @@
 ///   shall locate and act on that component's descendants as on those of any page.
 /// - R1.3 — If no page has been rendered yet, then the testkit shall throw an `AssertionError`
 ///   that says so.
-/// - R1.4 — If any method of the testkit or of the form helper is given `null`, then it shall
-///   throw a `NullPointerException` that names the parameter.
+/// - R1.4 — If any method of the testkit or of the form helper is given `null`, other than the
+///   expected model object of `assertModelObject`, then it shall throw a `NullPointerException`
+///   that names the parameter.
 ///
 /// ### R2: Exactly one
 /// - R2.1 — If the locator of an action, a form helper method or an assertion other than
@@ -126,6 +129,9 @@
 /// - R5.8 — When `assertOnAjaxResponse` is called, the testkit shall check that the last Ajax
 ///   response rendered the located component, as `WicketTester.assertComponentOnAjaxResponse`
 ///   does.
+/// - R5.9 — When `assertModelObject` is given `null`, the testkit shall check that the located
+///   component's model object is `null`.
+///   _(why: a test can then assert that a field was cleared)_
 ///
 /// ### R6: Count
 /// - R6.1 — When `assertCount` is called and exactly the given number of components match, the
@@ -149,10 +155,16 @@
 ///   `the component is not visible in hierarchy`.
 ///   _(why: WicketTester looks these components up as visible only, and fails with a
 ///   `NullPointerException` or "does not exist" otherwise)_
+/// - R7.4 — Where the WicketTester or FormTester error is an opentest4j `AssertionFailedError`,
+///   the testkit shall throw an `AssertionFailedError` with the message of R7.1 and the same
+///   expected and actual values.
+///   _(why: IDEs then offer their expected/actual diff; opentest4j comes with wicket-tester)_
 ///
-/// ### R8: Path for other WicketTester methods
+/// ### R8: Hand over to code the testkit doesn't wrap
 /// - R8.1 — When `pathOf` is called, the testkit shall return the located component's
 ///   page-relative path, which the tester's own methods accept.
+/// - R8.2 — When `one` is called, the testkit shall return the located component, typed as the
+///   locator's type.
 ///
 /// A complete message, for a label whose text differs:
 ///
@@ -165,8 +177,7 @@
 /// - the component started with `startComponentInPage` itself as the located component:
 ///   WicketTester's paths can't address it, only its descendants
 /// - a method for every WicketTester method: pass `pathOf` to the tester instead
-/// - feedback messages of a single form component: give
-///   `locator.one(tester.getLastRenderedPage())` to WicketTester's
+/// - feedback messages of a single form component: give `kit.one(locator)` to WicketTester's
 ///   `assertFeedbackMessages` with a `ComponentFeedbackMessageFilter`
 /// - a base class for page objects; the README shows page objects built on locators
 /// - Spring and `@WicketTest` integration (the dev.jbaby Wicket Spring Boot starter's test

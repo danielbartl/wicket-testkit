@@ -96,10 +96,12 @@ kit.assertFeedback(locate(FeedbackPanel.class).visible(), "Shipped order 42");  
 kit.assertCount(locate(Link.class).withId("ship").visible(), 0);
 ```
 
-For any `WicketTester` method without a counterpart here, `pathOf` gives you the path:
+For any `WicketTester` method without a counterpart here, `pathOf` gives you the path, and for any
+other check, `one` gives you the component:
 
 ```java
 tester.assertComponent(kit.pathOf(locate(Panel.class).withId("details")), DetailsPanel.class);
+assertThat(kit.one(locate(TextField.class).withId("customer")).isRequired()).isTrue();
 ```
 
 ### Forms
@@ -156,7 +158,7 @@ Expected exactly one match for an AjaxLink with id "ship" in OrdersPage, but fou
 ```
 
 When a `WicketTester` check fails, the locator and the component's path go in front of its
-message:
+message. Expected and actual values are kept, so your IDE still offers its diff:
 
 ```
 a Label with id "customer" in the row of Order[id=42, customer=Globex] (at orders:1:customer): expected: <ACME> but was: <Globex>
@@ -234,9 +236,6 @@ This exact page object runs as a test in
 - **Ajax fallback buttons.** `AjaxFallbackButton` extends `Button`, so `FormTester`, and with it
   `submit(button)`, submits through it without Ajax.
 - **`WicketTester`, not `BaseWicketTester`.** The assertions exist only on `WicketTester`.
-- **No diff view in the IDE.** `assertLabel` and `assertModelObject` wrap the
-  `AssertionFailedError` that WicketTester throws in a plain `AssertionError` with the locator in
-  front, so IDEs don't offer their expected/actual diff.
 - **Plain articles.** Descriptions put `an` before any vowel letter, so a `UserPanel` comes out as
   `an UserPanel`.
 - **Wicket 10 only.** Wicket 9 and older are not supported; Wicket 11 will follow.
