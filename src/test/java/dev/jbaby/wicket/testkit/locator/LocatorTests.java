@@ -17,6 +17,7 @@ import java.util.List;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.Page;
+import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.model.IModel;
@@ -290,6 +291,57 @@ class LocatorTests {
             assertThat(locate(Label.class).withId("customer").existsIn(page)).isTrue();
             assertThat(locate(Label.class).withId("title").existsIn(page)).isTrue();
             assertThat(locate(Label.class).withId("missing").existsIn(page)).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("R6 describe")
+    class Describe {
+
+        @Test
+        @DisplayName("R6.1 a locator describes itself with a or an and the class name of its type")
+        void describesTheTypeWithAnArticle() {
+            var anonymousLabel = new Label("anonymous") {
+            };
+
+            assertThat(locate(Label.class)).hasToString("a Label");
+            assertThat(locate(AjaxLink.class)).hasToString("an AjaxLink");
+            assertThat(locate(anonymousLabel.getClass())).hasToString("a Label");
+        }
+
+        @Test
+        @DisplayName("R6.2 refinements appear in the table's order, whatever order they were given in")
+        void describesRefinementsInTableOrder() {
+            var everything = locate(Label.class)
+                .inRowOf(Order.GLOBEX_42)
+                .inside(locate(UserPanel.class).withId("user"))
+                .matching(label -> true, "is bold")
+                .withModelObject("ACME")
+                .withId("customer")
+                .enabled()
+                .visible();
+
+            assertThat(everything).hasToString("a visible, enabled Label with id \"customer\""
+                + " with model object \"ACME\" that is bold inside an UserPanel with id \"user\""
+                + " in the row of Order[id=42, customer=Globex]");
+            assertThat(locate(Label.class).visible()).hasToString("a visible Label");
+            assertThat(locate(NoOpLink.class).enabled()).hasToString("an enabled NoOpLink");
+            assertThat(locate(Label.class).matching(label -> true, "is bold").matching(label -> true, "is short"))
+                .hasToString("a Label that is bold and is short");
+        }
+
+        @Test
+        @DisplayName("R6.3 strings appear in double quotes, other values as String.valueOf shows them")
+        void quotesStringsOnly() {
+            assertThat(locate(Label.class).withModelObject("42")).hasToString("a Label with model object \"42\"");
+            assertThat(locate(Label.class).withModelObject(42)).hasToString("a Label with model object 42");
+            assertThat(locate(Label.class).inRowOf("ACME")).hasToString("a Label in the row of \"ACME\"");
+        }
+
+        @Test
+        @DisplayName("R6.4 toString returns the description")
+        void toStringReturnsTheDescription() {
+            assertThat(locate(Label.class).withId("title").toString()).isEqualTo("a Label with id \"title\"");
         }
     }
 }

@@ -1,9 +1,12 @@
 package dev.jbaby.wicket.testkit.locator;
 
+import static java.util.stream.Collectors.joining;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.util.visit.IVisit;
@@ -231,6 +234,28 @@ public final class Locator<T extends Component> {
     /// @return the description
     @Override
     public String toString() {
-        throw new UnsupportedOperationException("not implemented yet");
+        var adjectives = Stream.of(new Criterion.Visible(), new Criterion.Enabled())
+            .filter(criteria::contains)
+            .map(Criterion::phrase)
+            .collect(joining(", "));
+        var text = new StringBuilder(Words.withArticle(
+            (adjectives.isEmpty() ? "" : adjectives + " ") + Words.className(type)));
+        appendPhrases(text, Criterion.Id.class);
+        appendPhrases(text, Criterion.ModelObject.class);
+        var matching = phrases(Criterion.Matching.class).collect(joining(" and "));
+        if (!matching.isEmpty()) {
+            text.append(" that ").append(matching);
+        }
+        appendPhrases(text, Criterion.Inside.class);
+        appendPhrases(text, Criterion.InRowOf.class);
+        return text.toString();
+    }
+
+    private void appendPhrases(StringBuilder text, Class<? extends Criterion> kind) {
+        phrases(kind).forEach(phrase -> text.append(' ').append(phrase));
+    }
+
+    private Stream<String> phrases(Class<? extends Criterion> kind) {
+        return criteria.stream().filter(kind::isInstance).map(Criterion::phrase);
     }
 }

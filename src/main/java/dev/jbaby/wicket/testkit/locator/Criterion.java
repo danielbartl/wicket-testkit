@@ -11,11 +11,19 @@ sealed interface Criterion {
     /// Whether the component meets this criterion.
     boolean test(Component component);
 
+    /// What this criterion adds to the locator's description.
+    String phrase();
+
     record Id(String id) implements Criterion {
 
         @Override
         public boolean test(Component component) {
             return id.equals(component.getId());
+        }
+
+        @Override
+        public String phrase() {
+            return "with id " + Words.value(id);
         }
     }
 
@@ -25,6 +33,11 @@ sealed interface Criterion {
         public boolean test(Component component) {
             return modelObject.equals(component.getDefaultModelObject());
         }
+
+        @Override
+        public String phrase() {
+            return "with model object " + Words.value(modelObject);
+        }
     }
 
     record Visible() implements Criterion {
@@ -32,6 +45,11 @@ sealed interface Criterion {
         @Override
         public boolean test(Component component) {
             return component.isVisibleInHierarchy();
+        }
+
+        @Override
+        public String phrase() {
+            return "visible";
         }
     }
 
@@ -41,6 +59,11 @@ sealed interface Criterion {
         public boolean test(Component component) {
             return component.isEnabledInHierarchy();
         }
+
+        @Override
+        public String phrase() {
+            return "enabled";
+        }
     }
 
     /// The predicate is only ever applied to components of the locator's type.
@@ -49,6 +72,11 @@ sealed interface Criterion {
         @Override
         public boolean test(Component component) {
             return predicate.test(component);
+        }
+
+        @Override
+        public String phrase() {
+            return description;
         }
     }
 
@@ -63,6 +91,11 @@ sealed interface Criterion {
             }
             return false;
         }
+
+        @Override
+        public String phrase() {
+            return "inside " + ancestor;
+        }
     }
 
     /// A row is a `ListItem`; `Item`, which `RefreshingView` renders, extends it.
@@ -76,6 +109,11 @@ sealed interface Criterion {
                 }
             }
             return false;
+        }
+
+        @Override
+        public String phrase() {
+            return "in the row of " + Words.value(element);
         }
     }
 }
