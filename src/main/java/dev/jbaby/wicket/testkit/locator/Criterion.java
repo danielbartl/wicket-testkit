@@ -2,6 +2,8 @@ package dev.jbaby.wicket.testkit.locator;
 
 import java.util.function.Predicate;
 import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
+import org.apache.wicket.markup.html.list.ListItem;
 
 /// One refinement of a locator: a condition a component has to meet besides the locator's type.
 sealed interface Criterion {
@@ -47,6 +49,33 @@ sealed interface Criterion {
         @Override
         public boolean test(Component component) {
             return predicate.test(component);
+        }
+    }
+
+    record Inside(Locator<?> ancestor) implements Criterion {
+
+        @Override
+        public boolean test(Component component) {
+            for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
+                if (ancestor.matches(parent)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// A row is a `ListItem`; `Item`, which `RefreshingView` renders, extends it.
+    record InRowOf(Object element) implements Criterion {
+
+        @Override
+        public boolean test(Component component) {
+            for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
+                if (parent instanceof ListItem && element.equals(parent.getDefaultModelObject())) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

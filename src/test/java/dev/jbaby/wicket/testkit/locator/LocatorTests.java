@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jbaby.wicket.testkit.fixtures.Headline;
 import dev.jbaby.wicket.testkit.fixtures.NoOpLink;
+import dev.jbaby.wicket.testkit.fixtures.Order;
 import dev.jbaby.wicket.testkit.fixtures.ShopPage;
 import dev.jbaby.wicket.testkit.fixtures.UserPanel;
 import java.util.List;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.Page;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.AfterEach;
@@ -120,6 +122,48 @@ class LocatorTests {
                 .matching(label -> label.getDefaultModelObjectAsString().startsWith("H"), "starts with H");
 
             assertThat(paths(startsWithH.all(page))).containsExactly("closed:reason");
+        }
+    }
+
+    @Nested
+    @DisplayName("R3 refine by position")
+    class RefineByPosition {
+
+        @Test
+        @DisplayName("R3.1 inside matches only components with an ancestor that the other locator matches")
+        void insideMatchesComponentsWithAMatchingAncestor() {
+            var user = (MarkupContainer) page.get("user");
+            var closed = (MarkupContainer) page.get("closed");
+
+            assertThat(paths(locate(Label.class).inside(locate(UserPanel.class)).all(page)))
+                .containsExactly("user:name");
+            assertThat(paths(locate(Label.class).inside(locate(WebMarkupContainer.class).withId("locked")).all(page)))
+                .containsExactly("locked:hint");
+            assertThat(locate(UserPanel.class).inside(locate(UserPanel.class)).all(page))
+                .as("the component itself is not its own ancestor")
+                .isEmpty();
+            assertThat(paths(locate(Label.class).inside(locate(UserPanel.class)).all(user)))
+                .as("ancestor at the root")
+                .containsExactly("user:name");
+            assertThat(paths(locate(Label.class).inside(locate(ShopPage.class)).all(closed)))
+                .as("ancestor above the root")
+                .containsExactly("closed:reason");
+        }
+
+        @Test
+        @DisplayName("R3.2 inRowOf matches only components inside a ListView row whose model object equals the argument")
+        void inRowOfMatchesListViewRows() {
+            assertThat(paths(locate(Label.class).inRowOf(Order.GLOBEX_42).all(page)))
+                .filteredOn(path -> path.startsWith("orders:"))
+                .containsExactly("orders:1:customer", "orders:1:number");
+        }
+
+        @Test
+        @DisplayName("R3.3 inRowOf matches only components inside a RefreshingView row whose model object equals the argument")
+        void inRowOfMatchesRefreshingViewRows() {
+            assertThat(paths(locate(Label.class).inRowOf(Order.GLOBEX_42).all(page)))
+                .filteredOn(path -> path.startsWith("table:"))
+                .containsExactly("table:2:customer");
         }
     }
 }

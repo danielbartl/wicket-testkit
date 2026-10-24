@@ -111,7 +111,7 @@ public final class Locator<T extends Component> {
     /// @param ancestor the locator an ancestor has to match
     /// @return a new locator with this criterion added
     public Locator<T> inside(Locator<?> ancestor) {
-        throw new UnsupportedOperationException("not implemented yet");
+        return with(new Criterion.Inside(ancestor));
     }
 
     /// Narrows this locator down to components in the row of an element: inside a repeater item
@@ -125,7 +125,7 @@ public final class Locator<T extends Component> {
     /// @param element the element the row shows, compared with `equals`
     /// @return a new locator with this criterion added
     public Locator<T> inRowOf(Object element) {
-        throw new UnsupportedOperationException("not implemented yet");
+        return with(new Criterion.InRowOf(element));
     }
 
     /// Narrows this locator down to components that a predicate accepts. The description says
