@@ -9,6 +9,7 @@ import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.util.tester.WicketTester;
+import org.apache.wicket.util.tester.WicketTesterHelper;
 
 /// Acts on and asserts about the components that locators find, through a `WicketTester` the
 /// test already has.
@@ -69,9 +70,13 @@ public final class WicketTestkit {
     /// @param event the event, such as `click` or `change`
     /// @throws AssertionError also if the component has no Ajax behavior for the event
     public void ajax(Locator<?> component, String event) {
-        notNull(component, "component");
         notNull(event, "event");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locateVisible(notNull(component, "component"));
+        if (WicketTesterHelper.findAjaxEventBehaviors(located, event).isEmpty()) {
+            throw new AssertionError(prefix(component, located)
+                + "the component has no Ajax behavior for the event \"" + event + "\"");
+        }
+        check(component, located, () -> tester.executeAjaxEvent(located, event));
     }
 
     /// Starts filling in a form, from its current values, as `WicketTester.newFormTester` does.

@@ -8,9 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.CounterPanel;
 import dev.jbaby.wicket.testkit.fixtures.Order;
+import dev.jbaby.wicket.testkit.fixtures.OrderPage;
 import dev.jbaby.wicket.testkit.fixtures.OrdersPage;
 import dev.jbaby.wicket.testkit.locator.Locator;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
@@ -143,6 +145,47 @@ class WicketTestkitTests {
                 .isExactlyInstanceOf(AssertionError.class)
                 .hasMessageStartingWith(
                     "Expected exactly one match for a Label with id \"customer\" in OrdersPage, but found 3:");
+        }
+    }
+
+    @Nested
+    @DisplayName("R3 act")
+    class Act {
+
+        @Test
+        @DisplayName("R3.1 click clicks a link as WicketTester.clickLink does")
+        void clickClicksALink() {
+            kit.click(locate(Link.class).withId("details").inRowOf(Order.GLOBEX_42));
+
+            tester.assertRenderedPage(OrderPage.class);
+            tester.assertLabel("customer", "Globex");
+        }
+
+        @Test
+        @DisplayName("R3.2 click clicks an Ajax link through Ajax as WicketTester.clickLink does")
+        void clickClicksAnAjaxLinkThroughAjax() {
+            kit.click(locate(AjaxLink.class).withId("ship").inRowOf(Order.GLOBEX_42));
+
+            tester.assertLabel("orders:1:status", "shipped");
+            tester.assertComponentOnAjaxResponse("orders:1:status");
+        }
+
+        @Test
+        @DisplayName("R3.3 ajax fires the event on the component as WicketTester.executeAjaxEvent does")
+        void ajaxFiresTheEvent() {
+            kit.ajax(locate(WebMarkupContainer.class).withId("bump"), "dblclick");
+
+            tester.assertLabel("bumps", "1");
+            tester.assertComponentOnAjaxResponse("bumps");
+        }
+
+        @Test
+        @DisplayName("R3.4 ajax fails if the component has no Ajax behavior for the event")
+        void ajaxFailsWithoutABehaviorForTheEvent() {
+            assertThatThrownBy(() -> kit.ajax(locate(WebMarkupContainer.class).withId("bump"), "click"))
+                .isExactlyInstanceOf(AssertionError.class)
+                .hasMessage("a WebMarkupContainer with id \"bump\" (at bump): "
+                    + "the component has no Ajax behavior for the event \"click\"");
         }
     }
 
