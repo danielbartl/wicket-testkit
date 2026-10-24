@@ -94,13 +94,15 @@ this, so the locating layer could become its own artifact later without breaking
 
 ### Layer 2: acting and asserting (`dev.jbaby.wicket.testkit`, wicket-tester)
 
-Entry point `WicketTestkit.of(tester)`, wrapping any `BaseWicketTester`. The root for locating is
-the last rendered page unless a root is given.
+Entry point `WicketTestkit.of(tester)`, wrapping any `WicketTester` (see D6). The root for
+locating is always the last rendered page; a locator is narrowed with `inside` instead (D7).
 
-- **Actions:** `click(locator)`, `ajax(event, locator)`.
-- **Forms:** `form(locator)` returns a small helper that computes form-relative paths from
+- **Actions:** `click(locator)`, `ajax(locator, event)` (D9).
+- **Forms:** `form(locator)` returns a `FormHelper` that computes form-relative paths from
   locators and delegates to `FormTester`: `set(fieldLocator, value)`, `select(fieldLocator,
-  index)`, `submit()`, `submit(buttonLocator)`, and an Ajax submit through a button.
+  index)`, `submit()`, `submit(buttonLocator)`. `FormTester.submit(Component)` already submits
+  through Ajax when the button is an `AjaxButton` or `AjaxSubmitLink`, so the Ajax submit needs
+  no method of its own.
 - **Assertions:** `assertLabel`, `assertVisible`, `assertInvisible`, `assertEnabled`,
   `assertDisabled`, `assertModelObject`, `assertFeedback`, `assertOnAjaxResponse`, `assertCount`.
 - **Escape hatch:** `pathOf(locator)` returns the page-relative path, so any WicketTester method
@@ -183,6 +185,17 @@ Settled on 2026-10-24.
 | D3 | Failure type: plain `AssertionError`, or opentest4j's `AssertionFailedError` (diff view in IDEs, one extra dependency) | **Plain `AssertionError`.** `AssertionFailedError` extends `AssertionError`, so switching later would not break callers. |
 | D4 | API names: `WicketTestkit.of`, `locate`, `one` / `all` / `existsIn`, `inRowOf` | **As proposed**, confirmed in the M1 review |
 | D5 | GitHub owner of the repository | **`danielbartl`**: `github.com/danielbartl/wicket-testkit` |
+
+Settled in the M1 spec review on 2026-10-24, after checking the Wicket 10.11 sources.
+
+| | Decision | Outcome |
+|---|---|---|
+| D6 | Wrap `BaseWicketTester` or `WicketTester` | **`WicketTester`.** The `assert*` methods exist only there, and `@WicketTest` provides a `WicketTester`. |
+| D7 | A custom root for Layer 2 | **None.** Always the last rendered page; narrow a locator with `inside`. |
+| D8 | Wicket's silent no-ops | **Fail.** `ajax` fails when the component has no Ajax behavior for the event; `set` and `select` fail on a disabled field. |
+| D9 | Names | `assertModelObject` (like `withModelObject`), `ajax(locator, event)` (locator first, like every other method), `FormHelper`. |
+| D10 | Context in delegated failures | **Wrap** WicketTester's `AssertionError` with the locator's description and path, keeping it as the cause. This gives up the IDE's expected/actual diff for `assertLabel` and `assertModelObject`. |
+| D11 | Commits per requirement group | **Accepted** that `SpecTraceabilityTests` stays red until the last group (M5) has its tests. |
 
 ## Prior art and credit
 
