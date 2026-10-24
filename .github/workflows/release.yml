@@ -1,0 +1,49 @@
+name: Release
+
+# Push a tag like v0.1.0 whose version matches the pom. Needs the secrets MAVEN_CENTRAL_USERNAME /
+# MAVEN_CENTRAL_PASSWORD (Central Portal user token) and MAVEN_GPG_KEY / MAVEN_GPG_PASSPHRASE.
+# The deployment waits for a manual "Publish" on central.sonatype.com.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # JDK 25, not 17: the /// Markdown Javadoc needs JDK 23 or newer. The bytecode is --release 17 either way.
+      - name: Set up JDK 25
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+
+      - name: Check the tag matches the project version
+        run: |
+          version=$(./mvnw -B -q help:evaluate -Dexpression=project.version -DforceStdout)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match project version $version"
+            exit 1
+          fi
+
+      - name: Publish to Maven Central
+        run: ./mvnw -B -ntp -P release deploy -Dgpg.signer=bc
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.MAVEN_GPG_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Create GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
