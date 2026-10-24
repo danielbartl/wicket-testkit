@@ -130,6 +130,38 @@ sealed interface Criterion {
         }
     }
 
+    /// The predicate is only ever applied to elements of the element type.
+    record InRowWhere(Class<?> elementType, Predicate<Object> predicate, String description) implements Criterion {
+
+        @Override
+        public boolean test(Component component) {
+            for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
+                if (parent instanceof ListItem) {
+                    var element = parent.getDefaultModelObject();
+                    if (elementType.isInstance(element) && predicate.test(element)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public String phrase() {
+            return "in the row of " + Words.withArticle(Words.className(elementType)) + " that " + description;
+        }
+
+        @Override
+        public String whatDiffers(Component component) {
+            return "is not " + phrase();
+        }
+
+        @Override
+        public int nearMissOrder() {
+            return 4;
+        }
+    }
+
     record ModelObject(Object modelObject) implements Criterion {
 
         /// Stands for a model object that could not be read.

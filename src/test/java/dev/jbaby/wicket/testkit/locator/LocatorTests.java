@@ -212,6 +212,16 @@ class LocatorTests {
                 .filteredOn(path -> path.startsWith("table:"))
                 .containsExactly("table:2:customer");
         }
+
+        @Test
+        @DisplayName("R3.4 inRowOf with a type and a predicate matches only components in a row whose element passes")
+        void inRowOfWithAPredicateMatchesRowsWhoseElementPasses() {
+            assertThat(paths(locate(Label.class).withId("customer")
+                .inRowOf(Order.class, order -> order.id() == 42, "has id 42").all(page)))
+                .containsExactly("orders:1:customer", "table:2:customer");
+            assertThat(locate(Label.class).inRowOf(String.class, element -> true, "is anything").all(page))
+                .isEmpty();
+        }
     }
 
     @Nested
@@ -249,6 +259,15 @@ class LocatorTests {
                     .withMessageContaining("ancestor"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.inRowOf(null))
                     .withMessageContaining("element"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> labels.inRowOf(null, element -> true, "is anything"))
+                    .withMessageContaining("elementType"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> labels.inRowOf(Order.class, null, "is anything"))
+                    .withMessageContaining("predicate"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> labels.inRowOf(Order.class, order -> true, null))
+                    .withMessageContaining("description"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.matching(null, "is bold"))
                     .withMessageContaining("predicate"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.matching(label -> true, null))
@@ -292,6 +311,7 @@ class LocatorTests {
 
             assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, ""));
             assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, "  "));
+            assertThatIllegalArgumentException().isThrownBy(() -> labels.inRowOf(Order.class, order -> true, " "));
         }
     }
 
@@ -373,6 +393,8 @@ class LocatorTests {
             assertThat(locate(NoOpLink.class).enabled()).hasToString("an enabled NoOpLink");
             assertThat(locate(Label.class).matching(label -> true, "is bold").matching(label -> true, "is short"))
                 .hasToString("a Label that is bold and is short");
+            assertThat(locate(Label.class).inRowOf(Order.class, order -> order.id() == 42, "has id 42"))
+                .hasToString("a Label in the row of an Order that has id 42");
         }
 
         @Test

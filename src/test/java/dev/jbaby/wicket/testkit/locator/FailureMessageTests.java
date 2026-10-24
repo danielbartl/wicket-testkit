@@ -142,6 +142,9 @@ class FailureMessageTests {
             .endsWith("\n  - locked:hint (is not inside an UserPanel)\n  - user:name (has id \"name\")");
         assertThat(messageOf(locate(Label.class).withId("title").inRowOf(Order.GLOBEX_42), page))
             .contains("\n  - title (is not in the row of Order[id=42, customer=Globex])\n");
+        assertThat(messageOf(locate(Label.class).withId("title")
+            .inRowOf(Order.class, order -> order.id() == 42, "has id 42"), page))
+            .contains("\n  - title (is not in the row of an Order that has id 42)\n");
         assertThat(messageOf(locate(Label.class).withId("title").withModelObject("Bazaar"), page))
             .endsWith("\n  - title (has model object \"Shop\")");
         assertThat(messageOf(locate(Label.class).withId("title").matching(label -> false, "is bold"), page))

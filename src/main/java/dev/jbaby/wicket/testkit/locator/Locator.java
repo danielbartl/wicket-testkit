@@ -136,6 +136,32 @@ public final class Locator<T extends Component> {
         return with(new Criterion.InRowOf(notNull(element, "element")));
     }
 
+    /// Narrows this locator down to components in the row of an element that a predicate accepts:
+    /// inside a repeater item whose model object is of the given type and passes the predicate.
+    /// Use it for elements that don't equal each other across requests, such as entities a
+    /// `LoadableDetachableModel` loads again. The description says what the predicate checks.
+    ///
+    /// ```java
+    /// locate(Label.class).withId("customer").inRowOf(Order.class, o -> o.getId() == 42, "has id 42")
+    /// ```
+    ///
+    /// @param elementType the type of the element the row shows
+    /// @param predicate the check the element has to pass
+    /// @param description what the predicate checks, completing "in the row of an Order that …"
+    /// @param <E> the type of the element
+    /// @return a new locator with this criterion added
+    /// @throws IllegalArgumentException if the description is blank
+    public <E> Locator<T> inRowOf(Class<E> elementType, Predicate<? super E> predicate, String description) {
+        notNull(elementType, "elementType");
+        notNull(predicate, "predicate");
+        if (notNull(description, "description").isBlank()) {
+            throw new IllegalArgumentException("description must not be blank");
+        }
+        @SuppressWarnings("unchecked") // InRowWhere applies it to elements of type E only
+        var anyElement = (Predicate<Object>) predicate;
+        return with(new Criterion.InRowWhere(elementType, anyElement, description));
+    }
+
     /// Narrows this locator down to components that a predicate accepts. The description says
     /// what the predicate checks, so failure messages stay readable.
     ///
@@ -293,15 +319,20 @@ public final class Locator<T extends Component> {
             text.append(" that ").append(matching);
         }
         appendPhrases(text, Criterion.Inside.class);
-        appendPhrases(text, Criterion.InRowOf.class);
+        appendPhrases(text, Criterion.InRowOf.class, Criterion.InRowWhere.class);
         return text.toString();
     }
 
-    private void appendPhrases(StringBuilder text, Class<? extends Criterion> kind) {
-        phrases(kind).forEach(phrase -> text.append(' ').append(phrase));
+    @SafeVarargs
+    private void appendPhrases(StringBuilder text, Class<? extends Criterion>... kinds) {
+        phrases(kinds).forEach(phrase -> text.append(' ').append(phrase));
     }
 
-    private Stream<String> phrases(Class<? extends Criterion> kind) {
-        return criteria.stream().filter(kind::isInstance).map(Criterion::phrase);
+    /// The phrases of the criteria of any of these kinds, in the order they were given.
+    @SafeVarargs
+    private Stream<String> phrases(Class<? extends Criterion>... kinds) {
+        return criteria.stream()
+            .filter(criterion -> Stream.of(kinds).anyMatch(kind -> kind.isInstance(criterion)))
+            .map(Criterion::phrase);
     }
 }

@@ -71,6 +71,10 @@
 ///   `ListView` row whose model object equals the argument.
 /// - R3.3 — Where `inRowOf` is given, the locator shall match only components inside a
 ///   `RefreshingView` row whose model object equals the argument, `DataView` rows included.
+/// - R3.4 — Where `inRowOf` is given an element type and a predicate, the locator shall match
+///   only components inside a row whose model object is of that type and accepted by the
+///   predicate.
+///   _(why: entities that are loaded again for every request often equal only themselves)_
 ///
 /// ### R4: Combine refinements
 /// - R4.1 — The locator shall match only components that meet all its criteria.
@@ -84,8 +88,8 @@
 ///   criteria, whatever order the refinements were given in.
 ///   _(why: models of unrelated components may load data or fail outside their own page, and a
 ///   predicate may only make sense for the components it was written for)_
-/// - R4.5 — If `matching` is given a blank description, then the locator shall throw an
-///   `IllegalArgumentException`.
+/// - R4.5 — If `matching` or `inRowOf` is given a blank description, then the locator shall
+///   throw an `IllegalArgumentException`.
 ///   _(why: the description is what failure messages show)_
 ///
 /// ### R5: Resolve
@@ -117,6 +121,7 @@
 /// | `matching` | ` that <description>`, several joined by ` and ` | `a TextField that is required` |
 /// | `inside` | ` inside <the other locator's description>` | `a Label inside a Panel with id "user"` |
 /// | `inRowOf` | ` in the row of <value>` | `a Label in the row of Order[id=42]` |
+/// | `inRowOf` with a predicate | ` in the row of <a or an> <class name> that <description>` | `a Label in the row of an Order that has id 42` |
 ///
 /// ### R7: Failure messages
 /// - R7.1 — If `one` finds no match, then the locator shall start the message with
@@ -144,7 +149,7 @@
 /// | `visible` | `is not visible` |
 /// | `enabled` | `is not enabled` |
 /// | `inside` | `is not inside <the other locator's description>` |
-/// | `inRowOf` | `is not in the row of <value>` |
+/// | `inRowOf` | `is not in the row of <value>`, or `is not in the row of <a or an> <class name> that <description>` |
 /// | `withModelObject` | `has model object <value>`, or `has a model object that cannot be read` |
 /// | `matching` | `does not match "<description>"` |
 /// | `withId` | `has id "<id>"` |
