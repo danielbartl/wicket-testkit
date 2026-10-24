@@ -2,6 +2,8 @@
 
 [![Build](https://github.com/danielbartl/wicket-testkit/actions/workflows/build.yml/badge.svg)](https://github.com/danielbartl/wicket-testkit/actions/workflows/build.yml)
 
+**[Website](https://danielbartl.github.io/wicket-testkit/)** &middot; **[User guide](https://danielbartl.github.io/wicket-testkit/guide.html)**
+
 Readable, refactoring-proof [Apache Wicket](https://wicket.apache.org/) tests.
 
 `WicketTester` addresses components by string paths such as `"orders:1:customer"`. Those paths

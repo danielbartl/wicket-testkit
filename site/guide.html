@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>wicket-testkit User Guide</title>
+<meta name="description" content="How to locate Wicket components with wicket-testkit, act and assert through WicketTester, fill in forms, read failure messages and build page objects.">
+<meta property="og:title" content="wicket-testkit User Guide">
+<meta property="og:description" content="Everything about testing Apache Wicket 10 pages with locators instead of string paths.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314181F'/%3E%3Cpath d='M8 13V8h5M19 8h5v5M24 19v5h-5M13 24H8v-5' fill='none' stroke='%233DDC97' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%23E8ECF1'/%3E%3C/svg%3E">
+<script>try { var t = localStorage.getItem("wicket-testkit-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+/* Guide: one reading column with a sticky table of contents; brackets mark the current section. */
+.guide {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+  padding-block: clamp(2rem, 5vw, 3.5rem) 0;
+}
+@media (max-width: 960px) { .guide { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; } }
+
+/* ---------- table of contents ---------- */
+.toc { position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow-y: auto; font-size: var(--step--1); }
+@media (max-width: 960px) { .toc { position: static; max-height: none; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); padding: 0 1rem; } }
+.toc summary { font: 600 0.75rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); cursor: pointer; padding-block: 0.6rem; }
+.toc ol { list-style: none; margin: 0.25rem 0 0.75rem; padding: 0; }
+.toc ol ol { margin: 0.1rem 0 0.35rem 0.85rem; }
+.toc a { display: block; padding: 0.22rem 0.5rem; text-decoration: none; color: var(--ink-2); border-radius: 4px; }
+.toc a:hover { color: var(--ink); background: var(--surface); }
+.toc a[aria-current] { color: var(--ink); font-weight: 600; box-shadow: inset 2px 0 0 var(--hit); }
+
+/* ---------- reading column ---------- */
+main.doc { max-width: 48rem; min-width: 0; }
+.doc > header h1 { font-size: var(--step-3); font-weight: 850; font-stretch: 105%; letter-spacing: -0.02em; margin-top: 0.6rem; }
+.doc > header p:not(.eyebrow) { margin-top: 1rem; font-size: var(--step-1); line-height: 1.5; color: var(--ink-2); }
+.doc h2 { font-size: var(--step-2); font-weight: 800; letter-spacing: -0.01em; margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--rule); scroll-margin-top: 5rem; }
+.doc h3 { font-size: var(--step-1); font-weight: 750; margin-top: 2.25rem; scroll-margin-top: 5rem; }
+.doc p, .doc ul, .doc ol, .doc dl { margin-top: 1rem; max-width: var(--measure); }
+.doc ul, .doc ol { padding-left: 1.3rem; }
+.doc li + li { margin-top: 0.4rem; }
+.doc dt { font-weight: 700; margin-top: 1rem; }
+.doc dd { margin: 0.25rem 0 0; color: var(--ink-2); }
+.doc .table-wrap { max-width: none; }
+.doc .message { margin-top: 1.25rem; }
+.note {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--hit);
+  max-width: var(--measure);
+}
+.note.warn { border-left-color: var(--miss); }
+.note p { margin: 0; }
+.note p + p { margin-top: 0.5rem; }
+.anchor { text-decoration: none; color: var(--ink-3); margin-left: 0.4rem; font-weight: 400; opacity: 0; }
+h2:hover .anchor, h3:hover .anchor, .anchor:focus { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="./" aria-label="wicket-testkit home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12V5h7M20 5h7v7M27 20v7h-7M12 27H5v-7" fill="none" stroke="var(--hit)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/></svg>
+      <span>wicket<span class="dim">-</span>testkit</span>
+    </a>
+    <nav class="nav" aria-label="Site">
+      <a class="sec" href="./">Overview</a>
+      <a href="guide.html" aria-current="page">Guide</a>
+      <a class="gh" href="https://github.com/danielbartl/wicket-testkit"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span class="t">GitHub</span></a>
+      <button class="theme-btn" type="button"><span class="lbl">Theme: </span>auto</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap guide">
+  <nav class="toc" aria-label="Guide contents">
+    <details open>
+      <summary>Contents</summary>
+      <ol>
+        <li><a href="#purpose">What it is for</a></li>
+        <li><a href="#install">Installation</a></li>
+        <li><a href="#start">Getting started</a></li>
+        <li><a href="#locating">Locating components</a>
+          <ol>
+            <li><a href="#refinements">Refinements</a></li>
+            <li><a href="#rows">Rows</a></li>
+            <li><a href="#resolving">Resolving</a></li>
+            <li><a href="#descriptions">Descriptions</a></li>
+          </ol>
+        </li>
+        <li><a href="#acting">Clicking and Ajax</a></li>
+        <li><a href="#asserting">Asserting</a></li>
+        <li><a href="#forms">Forms</a>
+          <ol>
+            <li><a href="#forms-submit">Submitting</a></li>
+            <li><a href="#forms-ajax">Ajax on fields</a></li>
+            <li><a href="#forms-requests">One helper per request</a></li>
+            <li><a href="#forms-guards">What fails, and why</a></li>
+          </ol>
+        </li>
+        <li><a href="#messages">Failure messages</a></li>
+        <li><a href="#panels">Testing a panel</a></li>
+        <li><a href="#page-objects">Page objects</a></li>
+        <li><a href="#spring">With Spring Boot</a></li>
+        <li><a href="#limits">Limits</a></li>
+        <li><a href="#reference">API reference</a></li>
+        <li><a href="#credits">Credits</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <main class="doc">
+    <header>
+      <p class="eyebrow">User guide · version 0.1.0</p>
+      <h1>Testing Wicket pages with locators</h1>
+      <p>Everything about wicket-testkit: how to find components, act on them, fill in forms, read the failure
+        messages and build page objects. It assumes you know Apache Wicket and its <code>WicketTester</code>.</p>
+    </header>
+
+    <h2 id="purpose">What it is for<a class="anchor" href="#purpose" aria-label="Link to this section">#</a></h2>
+    <p><code>WicketTester</code> addresses components by string paths such as <code>"orders:1:customer"</code>. Such a
+      path encodes the whole component tree on the way to the component. It breaks as soon as someone wraps a
+      container around the list or the rows change order, and in the second case it may silently check the wrong
+      row. It also tells the reader nothing about what the test means.</p>
+    <p>wicket-testkit lets a test <em>locate</em> a component by what it is: its type, its <code>wicket:id</code>, its
+      model object, its state, the component it sits in, or the row of a list it belongs to. Then it acts and asserts
+      on that component through the same <code>WicketTester</code> methods you use today.</p>
+    <p>Five principles shape it:</p>
+    <ul>
+      <li><strong>It wraps your tester.</strong> It never subclasses <code>WicketTester</code>, so any tester works,
+        including one your test framework hands you, and the tester stays usable next to it.</li>
+      <li><strong>Same semantics as WicketTester.</strong> Every action and assertion finds one component and calls the
+        WicketTester or FormTester method that does the job. Wicket&#8217;s behaviour is never re-implemented.</li>
+      <li><strong>Exactly one by default.</strong> A locator used for an action or an assertion has to match exactly
+        one component. Anything else fails with a message that says what was searched and what was found.</li>
+      <li><strong>Framework-agnostic.</strong> Failures are <code>AssertionError</code>s, so it works with JUnit,
+        TestNG or anything else.</li>
+      <li><strong>Test scope only.</strong> It is a test library. Production code that needs to walk the component tree
+        uses Wicket&#8217;s own <code>visitChildren</code>.</li>
+    </ul>
+
+    <h2 id="install">Installation<a class="anchor" href="#install" aria-label="Link to this section">#</a></h2>
+    <p>Add wicket-testkit in test scope. It needs Apache Wicket 10 and Java 17 or newer.</p>
+    <div class="code">
+      <div class="bar"><span class="name">pom.xml</span><button class="copy" type="button">Copy</button></div>
+      <pre><code data-lang="xml">&lt;dependency&gt;
+    &lt;groupId&gt;dev.jbaby&lt;/groupId&gt;
+    &lt;artifactId&gt;wicket-testkit&lt;/artifactId&gt;
+    &lt;version&gt;0.1.0&lt;/version&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+    </div>
+    <div class="code">
+      <div class="bar"><span class="name">build.gradle.kts</span><button class="copy" type="button">Copy</button></div>
+      <pre><code data-lang="kotlin">testImplementation("dev.jbaby:wicket-testkit:0.1.0")</code></pre>
+    </div>
+    <p>It brings no dependencies of its own. It uses the <code>wicket-core</code> and <code>wicket-tester</code> your
+      project already has, so your Wicket version wins. Since Wicket 10, the tester classes live in their own artifact,
+      <code>org.apache.wicket:wicket-tester</code>; make sure it is on your test classpath.</p>
+    <div class="note"><p>0.1.0 is not on Maven Central yet. Until it is, build it from source with
+      <code>./mvnw install</code>.</p></div>
+
+    <h2 id="start">Getting started<a class="anchor" href="#start" aria-label="Link to this section">#</a></h2>
+    <p>Two imports do it: the <code>locate</code> factory, and <code>WicketTestkit</code>, which wraps your tester.</p>
+    <div class="code">
+      <div class="bar"><span class="name">OrdersPageTests.java</span><button class="copy" type="button">Copy</button></div>
+      <pre><code data-lang="java">import static dev.jbaby.wicket.testkit.locator.Locator.locate;
+
+import dev.jbaby.wicket.testkit.WicketTestkit;
+
+class OrdersPageTests {
+
+    WicketTester tester = new WicketTester(new MyApplication());
+    WicketTestkit kit = WicketTestkit.of(tester);
+
+    @Test
+    void shipsAnOrder() {
+        tester.startPage(OrdersPage.class);
+
+        kit.click(locate(AjaxLink.class).withId("ship").inRowOf(globex));
+
+        kit.assertLabel(locate(Label.class).withId("status").inRowOf(globex), "shipped");
+        kit.assertOnAjaxResponse(locate(Label.class).withId("status").inRowOf(globex));
+    }
+}</code></pre>
+    </div>
+    <p>Start pages and components with the tester as you always have. The testkit always works on the page the
+      tester rendered last, looked up at the moment you call it, so after a click that renders another page, the next
+      locator searches the new one.</p>
+
+    <h2 id="locating">Locating components<a class="anchor" href="#locating" aria-label="Link to this section">#</a></h2>
+    <p>A <code>Locator</code> describes components. It starts with a type, and refinements narrow it down. A
+      component matches when it meets every criterion.</p>
+    <div class="code"><pre><code data-lang="java">locate(Label.class)                       // every Label, subclasses included
+locate(Label.class).withId("customer")    // ... with this wicket:id
+locate(Component.class).withId("save")    // anything with this wicket:id</code></pre></div>
+    <p>Locators are immutable. Every refinement returns a new locator and leaves the original as it was, so you can
+      keep a base locator in a field and refine it where you use it.</p>
+    <div class="code"><pre><code data-lang="java">Locator&lt;Label&gt; customer = locate(Label.class).withId("customer");
+
+kit.assertLabel(customer.inRowOf(acme), "ACME");
+kit.assertLabel(customer.inRowOf(globex), "Globex");</code></pre></div>
+
+    <h3 id="refinements">Refinements<a class="anchor" href="#refinements" aria-label="Link to this section">#</a></h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Refinement</th><th>Matches components</th></tr></thead>
+        <tbody>
+          <tr><td><code>withId("customer")</code></td><td>with this <code>wicket:id</code></td></tr>
+          <tr><td><code>withModelObject("ACME")</code></td><td>whose model object <code>equals</code> the argument;
+            <code>null</code> matches components whose model object is <code>null</code></td></tr>
+          <tr><td><code>visible()</code></td><td>that are visible in hierarchy: they and all their parents are visible</td></tr>
+          <tr><td><code>enabled()</code></td><td>that are enabled in hierarchy</td></tr>
+          <tr><td><code>inside(otherLocator)</code></td><td>with an ancestor that the other locator matches, anywhere above them</td></tr>
+          <tr><td><code>inRowOf(order)</code></td><td>in the row of a list whose element <code>equals</code> the argument</td></tr>
+          <tr><td><code>inRowOf(Order.class, predicate, "…")</code></td><td>in a row whose element is of that type and passes the predicate</td></tr>
+          <tr><td><code>matching(predicate, "…")</code></td><td>that the predicate accepts</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><code>matching</code> is the way out for anything else. Its description is required, because failure messages
+      show it; it completes the sentence &#8220;a TextField that &#8230;&#8221;:</p>
+    <div class="code"><pre><code data-lang="java">locate(TextField.class).matching(FormComponent::isRequired, "is required")
+locate(Label.class).matching(label -&gt; label.getDefaultModelObjectAsString().isBlank(), "is empty")</code></pre></div>
+    <p><code>inside</code> takes another locator, so you can scope a search to a panel, a form or a dialog:</p>
+    <div class="code"><pre><code data-lang="java">locate(Button.class).withId("save").inside(locate(Panel.class).withId("address"))</code></pre></div>
+    <p>A locator doesn&#8217;t filter by visibility unless you call <code>visible()</code>. That way the same locator
+      works for asserting that something is hidden. When a page has the same component twice, once hidden, add
+      <code>visible()</code> to pick the one that shows.</p>
+    <div class="note">
+      <p><strong>Model objects and predicates come last.</strong> A locator reads a component&#8217;s model object, and
+        runs your predicate on it, only once the component has met the type and every other criterion, whatever order
+        you wrote them in. Models of unrelated components are never loaded, and a predicate only sees the components
+        it was written for.</p>
+      <p>A model object that can&#8217;t be read doesn&#8217;t match. That happens under a
+        <code>CompoundPropertyModel</code>, which gives every component without a model of its own a model for the
+        property of its id; if the object has no such property, reading it throws.</p>
+    </div>
+
+    <h3 id="rows">Rows<a class="anchor" href="#rows" aria-label="Link to this section">#</a></h3>
+    <p>A row is a <code>ListItem</code>: what <code>ListView</code> renders for each element of its list.
+      <code>RefreshingView</code> and <code>DataView</code> render an <code>Item</code>, which extends
+      <code>ListItem</code>, so they are covered too, and so are <code>PropertyListView</code>,
+      <code>PageableListView</code> and <code>GridView</code>. The row&#8217;s element is its model object.</p>
+    <div class="code"><pre><code data-lang="java">locate(Link.class).withId("details").inRowOf(order)</code></pre></div>
+    <p><code>inRowOf(order)</code> compares with <code>equals</code>. Records and value objects work out of the box.
+      Entities that a <code>LoadableDetachableModel</code> loads again for every request often equal only themselves;
+      match their row with a predicate instead. The description completes &#8220;in the row of an Order that
+      &#8230;&#8221;:</p>
+    <div class="code"><pre><code data-lang="java">locate(Label.class).withId("customer")
+    .inRowOf(Order.class, o -&gt; o.getId().equals(orderId), "has id " + orderId)</code></pre></div>
+    <p>Items of <code>Loop</code> and the children of a plain <code>RepeatingView</code> are not rows. Locate them
+      with <code>inside</code> or <code>matching</code>.</p>
+
+    <h3 id="resolving">Resolving<a class="anchor" href="#resolving" aria-label="Link to this section">#</a></h3>
+    <p>The testkit resolves locators for you. To use a locator on its own, for example in a helper that gets a
+      container, give it a root: a page or any other container. The root itself is never a candidate, only its
+      descendants are.</p>
+    <dl>
+      <dt><code>one(root)</code></dt>
+      <dd>The one matching component, typed as the locator&#8217;s type. No match or several matches throw an
+        <code>AssertionError</code> with <a href="#messages">a message that explains</a>.</dd>
+      <dt><code>all(root)</code></dt>
+      <dd>Every match in tree order (depth first, a parent before its children), possibly empty.</dd>
+      <dt><code>existsIn(root)</code></dt>
+      <dd>Whether anything matches.</dd>
+    </dl>
+    <p>The locating layer, <code>dev.jbaby.wicket.testkit.locator</code>, uses nothing from wicket-tester, so it works
+      on any component tree.</p>
+
+    <h3 id="descriptions">Descriptions<a class="anchor" href="#descriptions" aria-label="Link to this section">#</a></h3>
+    <p>A locator describes itself in plain words, and every failure message uses that description.
+      <code>toString()</code> returns it.</p>
+    <div class="code"><pre><code data-lang="java">locate(Label.class).withId("customer").inRowOf(order)
+// a Label with id "customer" in the row of Order[id=42, customer=Globex]
+
+locate(Button.class).visible().enabled().inside(locate(Panel.class).withId("address"))
+// a visible, enabled Button inside a Panel with id "address"</code></pre></div>
+    <p>The parts always come in the same order: <code>visible</code> and <code>enabled</code> before the type, then id,
+      model object, <code>matching</code> descriptions, <code>inside</code> and row. Strings are quoted, other values
+      appear as <code>String.valueOf</code> shows them, so give your row elements a readable <code>toString</code>.</p>
+
+    <h2 id="acting">Clicking and Ajax<a class="anchor" href="#acting" aria-label="Link to this section">#</a></h2>
+    <dl>
+      <dt><code>kit.click(link)</code></dt>
+      <dd>Clicks a link, as <code>WicketTester.clickLink</code> does: <code>Link</code>, <code>AjaxLink</code> (through
+        Ajax), <code>AjaxFallbackLink</code>, <code>SubmitLink</code>, <code>AjaxSubmitLink</code>,
+        <code>BookmarkablePageLink</code> and the other link types it knows.</dd>
+      <dt><code>kit.ajax(component, event)</code></dt>
+      <dd>Fires an Ajax event on a component, as <code>WicketTester.executeAjaxEvent</code> does.</dd>
+    </dl>
+    <div class="code"><pre><code data-lang="java">kit.click(locate(Link.class).withId("details").inRowOf(order));
+kit.ajax(locate(WebMarkupContainer.class).withId("row").inRowOf(order), "dblclick");</code></pre></div>
+    <p>Where WicketTester would quietly do nothing, the testkit fails: <code>ajax</code> on a component that has no
+      Ajax behavior for the event throws an <code>AssertionError</code> that says so.</p>
+    <div class="note warn"><p><code>kit.ajax</code> sends no form input. For a form field with an
+      <code>AjaxFormComponentUpdatingBehavior</code>, it would leave the field&#8217;s model empty. Use the
+      <a href="#forms-ajax">form helper&#8217;s <code>ajax</code></a>, which sends the new value.</p></div>
+
+    <h2 id="asserting">Asserting<a class="anchor" href="#asserting" aria-label="Link to this section">#</a></h2>
+    <p>Each assertion finds one component and calls the WicketTester assertion next to it in the table.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>wicket-testkit</th><th>WicketTester</th><th>Checks</th></tr></thead>
+        <tbody>
+          <tr><td><code>assertLabel(label, "text")</code></td><td><code>assertLabel</code></td><td>a label&#8217;s text</td></tr>
+          <tr><td><code>assertVisible(c)</code></td><td><code>assertVisible</code></td><td>visible in hierarchy</td></tr>
+          <tr><td><code>assertInvisible(c)</code></td><td><code>assertInvisible</code></td><td>not visible in hierarchy</td></tr>
+          <tr><td><code>assertEnabled(c)</code></td><td><code>assertEnabled</code></td><td>enabled in hierarchy</td></tr>
+          <tr><td><code>assertDisabled(c)</code></td><td><code>assertDisabled</code></td><td>not enabled in hierarchy</td></tr>
+          <tr><td><code>assertModelObject(c, value)</code></td><td><code>assertModelValue</code></td><td>the model object; <code>null</code> for none</td></tr>
+          <tr><td><code>assertFeedback(panel, "msg"…)</code></td><td><code>assertFeedback</code></td><td>a feedback panel shows these messages, in any order</td></tr>
+          <tr><td><code>assertOnAjaxResponse(c)</code></td><td><code>assertComponentOnAjaxResponse</code></td><td>the last Ajax response rendered it</td></tr>
+          <tr><td><code>assertCount(locator, n)</code></td><td>(its own)</td><td>exactly <code>n</code> components match, zero included</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><code>assertLabel</code> takes a locator of labels and <code>assertFeedback</code> one of feedback panels, so the
+      compiler catches a mix-up.</p>
+    <div class="code"><pre><code data-lang="java">kit.assertLabel(locate(Label.class).withId("total"), "42.00");
+kit.assertInvisible(locate(Link.class).withId("ship").inRowOf(shippedOrder));
+kit.assertFeedback(locate(FeedbackPanel.class).visible(), "Customer is required.");
+kit.assertCount(locate(Label.class).withId("customer"), 3);</code></pre></div>
+    <p><code>assertInvisible</code> needs the component to exist, hidden. To assert that nothing matches at all, use
+      <code>assertCount(locator, 0)</code>.</p>
+
+    <h3 id="escape">For anything the testkit doesn&#8217;t wrap<a class="anchor" href="#escape" aria-label="Link to this section">#</a></h3>
+    <dl>
+      <dt><code>kit.one(locator)</code></dt>
+      <dd>The located component, typed, for your own checks.</dd>
+      <dt><code>kit.pathOf(locator)</code></dt>
+      <dd>Its page-relative path, which every <code>WicketTester</code> method takes.</dd>
+    </dl>
+    <div class="code"><pre><code data-lang="java">TextField&lt;?&gt; customer = kit.one(locate(TextField.class).withId("customer"));
+assertThat(customer.isRequired()).isTrue();
+
+tester.assertComponent(kit.pathOf(locate(Panel.class).withId("details")), DetailsPanel.class);
+tester.assertFeedbackMessages(new ComponentFeedbackMessageFilter(customer), "Customer is required.");</code></pre></div>
+
+    <h2 id="forms">Forms<a class="anchor" href="#forms" aria-label="Link to this section">#</a></h2>
+    <p><code>kit.form(locator)</code> returns a <code>FormHelper</code> for the located form. It wraps a
+      <code>FormTester</code>, starting from the form&#8217;s current values, and finds fields, buttons and any other
+      component <em>inside that form</em>, however deep they are nested. You never write a form-relative path.</p>
+    <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
+    .set(locate(TextField.class).withId("customer"), "Globex")
+    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .submit();</code></pre></div>
+    <dl>
+      <dt><code>set(field, "input")</code></dt>
+      <dd>Sets a field&#8217;s input as a user would type it, as <code>FormTester.setValue</code> does.</dd>
+      <dt><code>select(field, index)</code></dt>
+      <dd>Selects the choice at an index, from zero, as <code>FormTester.select</code> does.</dd>
+      <dt><code>ajax(component, event)</code></dt>
+      <dd>Fires an Ajax event inside the form, sending the values set so far.</dd>
+      <dt><code>submit()</code> / <code>submit(button)</code></dt>
+      <dd>Submits the form, without or through a button.</dd>
+      <dt><code>formTester()</code></dt>
+      <dd>The <code>FormTester</code> behind it, for files, multiple selections and check boxes as booleans.</dd>
+    </dl>
+
+    <h3 id="forms-submit">Submitting<a class="anchor" href="#forms-submit" aria-label="Link to this section">#</a></h3>
+    <p><code>submit(button)</code> submits through the button, as <code>FormTester.submit(Component)</code> does. For an
+      <code>AjaxButton</code> or <code>AjaxSubmitLink</code> that means an Ajax submit with the values set so far, so
+      there is no separate method for it.</p>
+    <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
+    .set(locate(TextField.class).withId("customer"), "Globex")
+    .submit(locate(AjaxButton.class).withId("save"));
+
+kit.assertOnAjaxResponse(locate(FeedbackPanel.class).visible());</code></pre></div>
+    <p><code>AjaxFallbackButton</code> extends <code>Button</code>, not <code>AjaxButton</code>, so FormTester submits
+      through it without Ajax.</p>
+
+    <h3 id="forms-ajax">Ajax on fields<a class="anchor" href="#forms-ajax" aria-label="Link to this section">#</a></h3>
+    <p>An <code>AjaxFormComponentUpdatingBehavior</code> reads the field&#8217;s new input from the request. Set or
+      select the value, then fire the event through the form helper:</p>
+    <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
+    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .ajax(locate(DropDownChoice.class).withId("country"), "change");
+
+kit.assertLabel(locate(Label.class).withId("shipping"), "Shipping to Germany");</code></pre></div>
+
+    <h3 id="forms-requests">One helper per request<a class="anchor" href="#forms-requests" aria-label="Link to this section">#</a></h3>
+    <p>A <code>FormTester</code> puts its values into the tester&#8217;s current request. So a form helper lives for one
+      request:</p>
+    <ul>
+      <li>Until the tester handles another request, <code>kit.form(…)</code> returns <strong>the same helper</strong>
+        for the same form, with the values set so far. A page object can fill in a form across several methods, each
+        calling <code>kit.form(…)</code>.</li>
+      <li>Once a submit, an Ajax event or any other request was sent, the old helper fails with
+        <code>the tester has handled a request since this form helper was created; call form again</code>. Call
+        <code>kit.form(…)</code> again; the new helper starts from the form&#8217;s values as they are now.</li>
+    </ul>
+    <div class="code"><pre><code data-lang="java">void enterCustomer(String name) {
+    kit.form(order).set(locate(TextField.class).withId("customer"), name);
+}
+
+void save() {
+    kit.form(order).submit(locate(Button.class).withId("save"));  // same helper, sends the name
+}</code></pre></div>
+
+    <h3 id="forms-guards">What fails, and why<a class="anchor" href="#forms-guards" aria-label="Link to this section">#</a></h3>
+    <p>Where Wicket or FormTester would drop a value without a word, the form helper fails instead:</p>
+    <ul>
+      <li><strong>A disabled field.</strong> Wicket ignores its input, so <code>set</code> and <code>select</code>
+        fail with <code>the component is not enabled in hierarchy</code>. So does <code>submit</code> through a
+        disabled button, which nobody could click.</li>
+      <li><strong>A hidden field or button.</strong> It fails with <code>the component is not visible in
+        hierarchy</code>.</li>
+      <li><strong>A field with a <code>FormComponentUpdatingBehavior</code>.</strong> <code>FormTester.select</code>
+        sends a request for it at once, which throws away every value set so far. <code>select</code> fails and says
+        so; if you mean it, select through <code>formTester()</code>:</li>
+    </ul>
+    <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order")).formTester().select("speed", 1);</code></pre></div>
+
+    <h2 id="messages">Failure messages<a class="anchor" href="#messages" aria-label="Link to this section">#</a></h2>
+    <p>Every failure is an <code>AssertionError</code>. The messages follow a fixed format, specified and tested so it
+      stays stable.</p>
+
+    <h3 id="messages-none">Nothing matches<a class="anchor" href="#messages-none" aria-label="Link to this section">#</a></h3>
+    <p>The message names the criteria and the root. If the locator has at least two criteria (its type counts as one),
+      it lists the <strong>near misses</strong>: components that meet every criterion but one, each with what
+      differs.</p>
+    <div class="message"><pre>Expected exactly one match for a Label with id "customr" in the row of Order[id=42, customer=Globex] in OrdersPage, but found none.
+Near misses (all criteria but one):
+  - orders:1:customer (has id "customer")
+  - orders:1:status (has id "status")</pre></div>
+    <p>Near misses come in the order of the criterion they miss, most telling first; within each, in tree order. At
+      most five are shown, then how many more there are.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Missed criterion</th><th>What the near miss says</th></tr></thead>
+        <tbody>
+          <tr><td>type</td><td><code>is a NoOpLink</code>, <code>is an AjaxLink</code></td></tr>
+          <tr><td><code>visible</code></td><td><code>is not visible</code></td></tr>
+          <tr><td><code>enabled</code></td><td><code>is not enabled</code></td></tr>
+          <tr><td><code>inside</code></td><td><code>is not inside a Panel with id "address"</code></td></tr>
+          <tr><td><code>inRowOf</code></td><td><code>is not in the row of Order[id=42, customer=Globex]</code></td></tr>
+          <tr><td><code>withModelObject</code></td><td><code>has model object "ACME"</code>, or <code>has a model object that cannot be read</code></td></tr>
+          <tr><td><code>matching</code></td><td><code>does not match "is required"</code></td></tr>
+          <tr><td><code>withId</code></td><td><code>has id "status"</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A locator that misses the type or any other cheap criterion is not asked for its model object or predicate, so
+      such components count as near misses only for locators without those. Building the message never throws: a
+      criterion that fails while near misses are collected simply counts as missed.</p>
+
+    <h3 id="messages-several">Several match<a class="anchor" href="#messages-several" aria-label="Link to this section">#</a></h3>
+    <div class="message"><pre>Expected exactly one match for an AjaxLink with id "ship" in OrdersPage, but found 3:
+  - orders:0:ship
+  - orders:1:ship
+  - orders:2:ship</pre></div>
+    <p>At most ten paths are listed, then how many more there are. <code>assertCount</code> lists its matches the same
+      way, starting with <code>Expected 2 matches for &#8230;</code>.</p>
+
+    <h3 id="messages-wickettester">WicketTester&#8217;s own failures<a class="anchor" href="#messages-wickettester" aria-label="Link to this section">#</a></h3>
+    <p>When the WicketTester or FormTester method fails, the locator&#8217;s description and the component&#8217;s path go
+      in front of its message, and its error stays the cause:</p>
+    <div class="message"><pre>a Label with id "customer" in the row of Order[id=42, customer=Globex] (at orders:1:customer): expected: &lt;ACME&gt; but was: &lt;Globex&gt;</pre></div>
+    <p>When WicketTester&#8217;s error is opentest4j&#8217;s <code>AssertionFailedError</code>, as for
+      <code>assertLabel</code> and <code>assertModelObject</code>, the testkit throws one too, with the same expected
+      and actual values, so your IDE still offers its diff. A component that is not visible in hierarchy, where
+      WicketTester would fail with a <code>NullPointerException</code> or &#8220;does not exist&#8221;, gets a clear
+      message instead:</p>
+    <div class="message"><pre>a Label with id "secret" (at vault:secret): the component is not visible in hierarchy</pre></div>
+    <p>Any exception that is not an <code>AssertionError</code>, such as one thrown by your page&#8217;s
+      <code>onClick</code>, passes through unchanged: it is a bug in the application, not a failed check.</p>
+
+    <h2 id="panels">Testing a panel<a class="anchor" href="#panels" aria-label="Link to this section">#</a></h2>
+    <p>Start a panel or any other component on its own with <code>startComponentInPage</code>, and locate inside it
+      as on any page:</p>
+    <div class="code"><pre><code data-lang="java">tester.startComponentInPage(new CounterPanel("counter"));
+
+kit.click(locate(AjaxLink.class).withId("increment"));
+kit.assertLabel(locate(Label.class).withId("count"), "1");</code></pre></div>
+    <p>Everything inside the started component can be located, but not the component itself: WicketTester puts the
+      component&#8217;s id in front of every path it gets, and no path can then address the component.</p>
+
+    <h2 id="page-objects">Page objects<a class="anchor" href="#page-objects" aria-label="Link to this section">#</a></h2>
+    <p>Locators are values, which makes page objects short. Keep the locators in the page object, refine them per
+      row, and let the test speak the language of your domain:</p>
+    <div class="code">
+      <div class="bar"><span class="name">OrdersPageObject.java</span><button class="copy" type="button">Copy</button></div>
+      <pre><code data-lang="java">class OrdersPageObject {
+
+    private final WicketTestkit kit;
+
+    OrdersPageObject(WicketTestkit kit) {
+        this.kit = kit;
+    }
+
+    Row rowOf(Order order) {
+        return new Row(order);
+    }
+
+    class Row {
+
+        private final Order order;
+
+        Row(Order order) {
+            this.order = order;
+        }
+
+        void ship() {
+            kit.click(locate(AjaxLink.class).withId("ship").inRowOf(order));
+        }
+
+        void assertStatus(String status) {
+            kit.assertLabel(locate(Label.class).withId("status").inRowOf(order), status);
+        }
+    }
+}</code></pre>
+    </div>
+    <div class="code"><pre><code data-lang="java">@Test
+void shipsAnOrder() {
+    tester.startPage(OrdersPage.class);
+    var ordersPage = new OrdersPageObject(WicketTestkit.of(tester));
+
+    ordersPage.rowOf(globex).ship();
+
+    ordersPage.rowOf(globex).assertStatus("shipped");
+}</code></pre></div>
+    <p>Generic Wicket components such as <code>TextField</code> and <code>Form</code> make <code>locate</code> return
+      a raw type: <code>locate(TextField.class)</code> is a <code>Locator&lt;TextField&gt;</code>. Passed straight to a
+      method, that is fine. Kept in a field, it shows a raw-type warning; add
+      <code>@SuppressWarnings("rawtypes")</code> to the field, or declare it as <code>Locator&lt;?&gt;</code> where the
+      method takes any locator, as <code>click</code> and most assertions do.</p>
+
+    <h2 id="spring">With Spring Boot<a class="anchor" href="#spring" aria-label="Link to this section">#</a></h2>
+    <p>Any <code>WicketTester</code> works, whoever created it. With the dev.jbaby Wicket Spring Boot starter&#8217;s
+      test module, <code>@WicketTest</code> hands each test a tester running your application; wrap it:</p>
+    <div class="code"><pre><code data-lang="java">@WicketTest
+class OrdersPageTests {
+
+    @Test
+    void listsOpenOrders(WicketTester tester) {
+        var kit = WicketTestkit.of(tester);
+        tester.startPage(OrdersPage.class);
+
+        kit.assertCount(locate(Label.class).withId("customer"), 3);
+    }
+}</code></pre></div>
+
+    <h2 id="limits">Limits<a class="anchor" href="#limits" aria-label="Link to this section">#</a></h2>
+    <dl>
+      <dt>Exactly one</dt>
+      <dd>Every action and assertion needs its locator to match exactly one component. Narrow it with
+        <code>visible()</code>, <code>withId</code>, <code>inside</code> or <code>inRowOf</code>, and use
+        <code>assertCount</code> for &#8220;none&#8221;.</dd>
+      <dt>Always the last rendered page</dt>
+      <dd>Locators are resolved against the page the tester rendered last. To search a part of it, use
+        <code>inside</code>.</dd>
+      <dt>The component under test itself</dt>
+      <dd>After <code>startComponentInPage</code>, the started component can&#8217;t be located, only what is inside
+        it.</dd>
+      <dt>Rows are list items</dt>
+      <dd><code>Loop</code> items and plain <code>RepeatingView</code> children are not rows.</dd>
+      <dt>Ajax fallback buttons</dt>
+      <dd><code>AjaxFallbackButton</code> extends <code>Button</code>, so <code>submit(button)</code> submits through it
+        without Ajax.</dd>
+      <dt><code>WicketTester</code>, not <code>BaseWicketTester</code></dt>
+      <dd>The assertions exist only on <code>WicketTester</code>, so that is what <code>WicketTestkit.of</code>
+        takes.</dd>
+      <dt>Plain articles</dt>
+      <dd>Descriptions put &#8220;an&#8221; before any vowel letter, so a <code>UserPanel</code> comes out as
+        &#8220;an UserPanel&#8221;.</dd>
+      <dt>Wicket 10 only</dt>
+      <dd>Wicket 9 and older are not supported; Wicket 11 will follow.</dd>
+    </dl>
+
+    <h2 id="reference">API reference<a class="anchor" href="#reference" aria-label="Link to this section">#</a></h2>
+    <p>The Javadoc has every detail and an example per method. In short:</p>
+    <h3 id="ref-locator"><code>Locator&lt;T&gt;</code><a class="anchor" href="#ref-locator" aria-label="Link to this section">#</a></h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td><code>static locate(Class&lt;T&gt; type)</code></td><td>Starts a locator for that type, subtypes included.</td></tr>
+          <tr><td><code>withId(String id)</code></td><td>Narrows to a <code>wicket:id</code>.</td></tr>
+          <tr><td><code>withModelObject(Object modelObject)</code></td><td>Narrows to an equal model object, or <code>null</code>.</td></tr>
+          <tr><td><code>visible()</code>, <code>enabled()</code></td><td>Narrow to components visible or enabled in hierarchy.</td></tr>
+          <tr><td><code>inside(Locator&lt;?&gt; ancestor)</code></td><td>Narrows to components with a matching ancestor.</td></tr>
+          <tr><td><code>inRowOf(Object element)</code></td><td>Narrows to the row of an equal element.</td></tr>
+          <tr><td><code>inRowOf(Class&lt;E&gt;, Predicate&lt;? super E&gt;, String)</code></td><td>Narrows to the row of an element that passes the predicate.</td></tr>
+          <tr><td><code>matching(Predicate&lt;? super T&gt;, String)</code></td><td>Narrows to components the predicate accepts.</td></tr>
+          <tr><td><code>one(MarkupContainer root)</code></td><td>The one match, or an <code>AssertionError</code>.</td></tr>
+          <tr><td><code>all(MarkupContainer root)</code></td><td>Every match, in tree order.</td></tr>
+          <tr><td><code>existsIn(MarkupContainer root)</code></td><td>Whether anything matches.</td></tr>
+          <tr><td><code>toString()</code></td><td>The description.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 id="ref-kit"><code>WicketTestkit</code><a class="anchor" href="#ref-kit" aria-label="Link to this section">#</a></h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td><code>static of(WicketTester tester)</code></td><td>Wraps a tester.</td></tr>
+          <tr><td><code>click(Locator&lt;?&gt;)</code></td><td><code>clickLink</code></td></tr>
+          <tr><td><code>ajax(Locator&lt;?&gt;, String event)</code></td><td><code>executeAjaxEvent</code>; fails without a behavior for the event</td></tr>
+          <tr><td><code>form(Locator&lt;? extends Form&gt;)</code></td><td>A <code>FormHelper</code> for the form</td></tr>
+          <tr><td><code>assertLabel(Locator&lt;? extends Label&gt;, String)</code></td><td><code>assertLabel</code></td></tr>
+          <tr><td><code>assertVisible</code>, <code>assertInvisible</code>, <code>assertEnabled</code>, <code>assertDisabled</code></td><td>Their WicketTester namesakes</td></tr>
+          <tr><td><code>assertModelObject(Locator&lt;?&gt;, Object)</code></td><td><code>assertModelValue</code></td></tr>
+          <tr><td><code>assertFeedback(Locator&lt;? extends FeedbackPanel&gt;, Serializable…)</code></td><td><code>assertFeedback</code></td></tr>
+          <tr><td><code>assertOnAjaxResponse(Locator&lt;?&gt;)</code></td><td><code>assertComponentOnAjaxResponse</code></td></tr>
+          <tr><td><code>assertCount(Locator&lt;?&gt;, int)</code></td><td>How many match</td></tr>
+          <tr><td><code>one(Locator&lt;T&gt;)</code></td><td>The located component, typed</td></tr>
+          <tr><td><code>pathOf(Locator&lt;?&gt;)</code></td><td>Its page-relative path</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 id="ref-form"><code>FormHelper</code><a class="anchor" href="#ref-form" aria-label="Link to this section">#</a></h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td><code>set(Locator&lt;? extends FormComponent&gt;, String)</code></td><td><code>FormTester.setValue</code></td></tr>
+          <tr><td><code>select(Locator&lt;? extends FormComponent&gt;, int)</code></td><td><code>FormTester.select</code></td></tr>
+          <tr><td><code>ajax(Locator&lt;?&gt;, String event)</code></td><td><code>executeAjaxEvent</code> with the values set so far</td></tr>
+          <tr><td><code>submit()</code></td><td><code>FormTester.submit()</code></td></tr>
+          <tr><td><code>submit(Locator&lt;?&gt; button)</code></td><td><code>FormTester.submit(Component)</code>, through Ajax for Ajax buttons</td></tr>
+          <tr><td><code>formTester()</code></td><td>The <code>FormTester</code> itself</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="credits">Credits<a class="anchor" href="#credits" aria-label="Link to this section">#</a></h2>
+    <p>wicket-testkit builds on the idea of
+      <a href="https://github.com/otto-de/enhanced-wickettester">otto-de/enhanced-wickettester</a> (Apache 2.0), which
+      selected Wicket components by matchers instead of paths, back in Wicket 7. wicket-testkit is a from-scratch
+      rewrite for Wicket 10 and shares no code with it: it wraps <code>WicketTester</code> instead of subclassing it,
+      needs no TestNG, Hamcrest or commons-lang, and adds the row shortcut and the failure messages. The word
+      &#8220;locator&#8221; is borrowed from <a href="https://playwright.dev/">Playwright</a>.</p>
+    <p>Apache Wicket is a trademark of the Apache Software Foundation; this project is not part of it.
+      wicket-testkit is licensed under the <a href="https://github.com/danielbartl/wicket-testkit/blob/master/LICENSE">Apache License 2.0</a>.</p>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <h2>wicket-testkit</h2>
+      <p>Test helpers for Apache Wicket 10. Apache License 2.0.</p>
+    </div>
+    <div>
+      <h2>Read</h2>
+      <ul>
+        <li><a href="./">Overview</a></li>
+        <li><a href="https://github.com/danielbartl/wicket-testkit">Source on GitHub</a></li>
+        <li><a href="https://github.com/danielbartl/wicket-testkit/issues">Issues</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

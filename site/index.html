@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>wicket-testkit</title>
+<meta name="description" content="Readable, refactoring-proof Apache Wicket tests: locate components by type, wicket:id, model object and row instead of string paths, then act and assert through your own WicketTester.">
+<meta property="og:title" content="wicket-testkit">
+<meta property="og:description" content="Find Wicket components by what they are, not where they sit. Test helpers for WicketTester on Wicket 10.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314181F'/%3E%3Cpath d='M8 13V8h5M19 8h5v5M24 19v5h-5M13 24H8v-5' fill='none' stroke='%233DDC97' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%23E8ECF1'/%3E%3C/svg%3E">
+<script>try { var t = localStorage.getItem("wicket-testkit-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="site.css">
+<style>
+/* Layout: a viewfinder. The hero states the claim, the component tree below proves it: refactor the page
+   and watch the string path break while the locator keeps its target in the brackets. */
+
+section { padding-block: clamp(3rem, 7vw, 5.5rem); border-top: 1px solid var(--rule); }
+.section-head { max-width: 46rem; }
+.section-head h2 { font-size: var(--step-3); font-weight: 800; font-stretch: 105%; letter-spacing: -0.015em; margin-top: 0.6rem; }
+.section-head p { margin-top: 1rem; color: var(--ink-2); font-size: var(--step-1); line-height: 1.5; max-width: 60ch; }
+
+/* ---------- hero ---------- */
+.hero { padding-block: clamp(2.5rem, 6vw, 5rem) clamp(2.5rem, 5vw, 4.5rem); }
+.hero .wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 4vw, 4rem);
+  align-items: center;
+}
+@media (max-width: 960px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } }
+.hero h1 {
+  font-size: clamp(2.3rem, 1.2rem + 3.3vw, 4rem);
+  font-weight: 850;
+  font-stretch: 108%;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  margin-top: 1rem;
+}
+.hero h1 .quiet { display: block; font-weight: 500; font-stretch: 100%; color: var(--ink-2); }
+.lede { margin-top: 1.5rem; max-width: 54ch; font-size: var(--step-1); line-height: 1.5; color: var(--ink-2); }
+.lede strong { color: var(--ink); font-weight: 600; }
+.cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  padding: 0.8rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--ink);
+}
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn.primary:hover { background: var(--hit); border-color: var(--hit); color: var(--hit-ink); text-decoration: none; }
+.btn.ghost:hover { background: var(--surface); text-decoration: none; }
+.facts { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin: 2rem 0 0; padding: 0; list-style: none; font: 500 0.82rem/1.4 var(--mono); color: var(--ink-3); }
+.facts li::before { content: "\25AA\00A0"; color: var(--hit); }
+.hero .code { margin-top: 0; }
+.hero .code pre { font-size: 0.82rem; }
+
+/* ---------- the demo ---------- */
+#demo .layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: clamp(1.5rem, 3vw, 3rem);
+  margin-top: 2.5rem;
+  align-items: start;
+}
+@media (max-width: 900px) { #demo .layout { grid-template-columns: minmax(0, 1fr); } }
+.changes { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.changes button {
+  font: 600 0.9rem/1.2 var(--body);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+}
+.changes button:hover { border-color: var(--ink-3); }
+.changes button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.changes button[data-reset] { background: none; border-style: dashed; color: var(--ink-2); }
+.check {
+  margin-top: 1.25rem;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.check .label { font: 600 0.72rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 0.8rem 1rem 0; }
+.check pre { margin: 0.4rem 0 0; padding: 0 1rem 0.8rem; font-size: 0.8rem; line-height: 1.55; overflow-x: auto; color: var(--ink); }
+.verdict { padding: 0.7rem 1rem; font-size: 0.95rem; line-height: 1.45; border-top: 1px solid var(--rule); }
+.verdict b { font-weight: 700; }
+.verdict.good { background: var(--hit-soft); }
+.verdict.good b { color: var(--ink); }
+.verdict.bad { background: var(--miss-soft); }
+.verdict.bad b { color: var(--miss); }
+.verdict code { white-space: normal; overflow-wrap: anywhere; }
+
+.tree-box { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); padding: 1rem 0.5rem 1rem 0.75rem; }
+.tree-box .label { font: 600 0.72rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 0 0.5rem 0.6rem; }
+.tree { list-style: none; margin: 0; padding: 0; font: 0.84rem/1.35 var(--mono); }
+.tree li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.6rem;
+  padding: 0.28rem 0.5rem 0.28rem calc(0.5rem + var(--depth) * 1.15rem);
+  border-radius: 4px;
+  position: relative;
+}
+.tree li::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--depth) * 1.15rem - 0.55rem);
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--rule);
+}
+.tree li.root::before { content: none; }
+.tree .id { font-weight: 600; color: var(--ink); }
+.tree .type { color: var(--ink-3); }
+.tree .value { color: var(--ink-2); }
+.tree .tag { margin-left: auto; font: 600 0.68rem/1 var(--mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 0.25rem 0.45rem; border-radius: 3px; background: var(--paper); color: var(--ink-2); }
+.tree li.found {
+  --corner: 0.55rem;
+  --stroke: 2px;
+  background:
+    linear-gradient(var(--hit), var(--hit)) top left / var(--corner) var(--stroke),
+    linear-gradient(var(--hit), var(--hit)) top left / var(--stroke) var(--corner),
+    linear-gradient(var(--hit), var(--hit)) top right / var(--corner) var(--stroke),
+    linear-gradient(var(--hit), var(--hit)) top right / var(--stroke) var(--corner),
+    linear-gradient(var(--hit), var(--hit)) bottom left / var(--corner) var(--stroke),
+    linear-gradient(var(--hit), var(--hit)) bottom left / var(--stroke) var(--corner),
+    linear-gradient(var(--hit), var(--hit)) bottom right / var(--corner) var(--stroke),
+    linear-gradient(var(--hit), var(--hit)) bottom right / var(--stroke) var(--corner),
+    var(--hit-soft);
+  background-repeat: no-repeat;
+}
+.tree li.found .tag { background: var(--hit); color: var(--hit-ink); }
+.tree li.path.wrong { background: var(--miss-soft); box-shadow: inset 0 0 0 1.5px var(--miss); }
+.tree li.path.wrong .tag { background: var(--miss); color: #fff; }
+.tree li.added .tag { background: var(--ink); color: var(--paper); }
+.demo-note { margin-top: 1rem; color: var(--ink-3); font-size: var(--step--1); }
+
+/* ---------- how it works ---------- */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; margin: 2.5rem 0 0; padding: 0; list-style: none; counter-reset: step; }
+@media (max-width: 900px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.steps li { border-top: 3px solid var(--ink); padding-top: 1rem; counter-increment: step; }
+.steps li::before { content: "0" counter(step); font: 600 0.8rem/1 var(--mono); color: var(--ink-3); }
+.steps h3 { font-size: var(--step-1); font-weight: 750; margin-top: 0.6rem; }
+.steps p { margin-top: 0.6rem; color: var(--ink-2); }
+.steps .code { margin-top: 1rem; }
+.steps .code pre { font-size: 0.78rem; }
+
+/* ---------- two-column feature blocks ---------- */
+.split { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(1.5rem, 4vw, 4rem); align-items: start; }
+@media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.split .section-head p { font-size: var(--step-0); }
+.points { margin: 1.5rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.75rem; color: var(--ink-2); }
+.points li { padding-left: 1.4rem; position: relative; }
+.points li::before { content: ""; position: absolute; left: 0; top: 0.55em; width: 0.6rem; height: 0.6rem; border: 2px solid var(--hit); border-right: 0; border-bottom: 0; }
+.points strong { color: var(--ink); }
+.messages { display: grid; gap: 1rem; min-width: 0; }
+.messages figcaption { font-size: var(--step--1); color: var(--ink-3); margin-top: 0.45rem; }
+.messages figure { margin: 0; min-width: 0; }
+
+/* ---------- install ---------- */
+.tablist { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--code-rule); padding: 0.4rem 0.5rem 0; }
+.tablist [role=tab] {
+  font: 500 0.78rem/1 var(--mono);
+  color: var(--code-dim);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+}
+.tablist [role=tab][aria-selected="true"] { color: var(--code-fg); border-bottom-color: var(--hit); }
+.tabbed { background: var(--code-bg); border-radius: var(--radius); overflow: hidden; margin-top: 1.25rem; }
+.tabbed .code { margin-top: 0; border-radius: 0; }
+.tabbed .code .bar { border-bottom: 0; padding-top: 0.2rem; }
+.status-note { margin-top: 1rem; color: var(--ink-3); font-size: var(--step--1); }
+
+/* ---------- limits ---------- */
+.limits { columns: 2 22rem; column-gap: 3rem; margin: 2rem 0 0; padding: 0; list-style: none; }
+.limits li { break-inside: avoid; margin-bottom: 1.1rem; color: var(--ink-2); }
+.limits strong { color: var(--ink); display: block; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="./" aria-label="wicket-testkit home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12V5h7M20 5h7v7M27 20v7h-7M12 27H5v-7" fill="none" stroke="var(--hit)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="3.2" fill="currentColor"/></svg>
+      <span>wicket<span class="dim">-</span>testkit</span>
+    </a>
+    <nav class="nav" aria-label="Site">
+      <a class="sec" href="#demo">Why</a>
+      <a class="sec" href="#how">How it works</a>
+      <a class="sec" href="#install">Install</a>
+      <a href="guide.html">Guide</a>
+      <a class="gh" href="https://github.com/danielbartl/wicket-testkit"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span class="t">GitHub</span></a>
+      <button class="theme-btn" type="button"><span class="lbl">Theme: </span>auto</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">Test kit for Apache Wicket 10</p>
+        <h1>Find components by <span class="target">what they are</span><span class="quiet">not where they sit.</span></h1>
+        <p class="lede">WicketTester finds components by paths like <code>orders:1:customer</code>. Wrap a container
+          around them or sort a list, and the test breaks, or checks the wrong row. <strong>wicket-testkit locates
+          components by type, <code>wicket:id</code>, model object and row,</strong> then acts and asserts through the
+          WicketTester you already have.</p>
+        <div class="cta">
+          <a class="btn primary" href="guide.html">Read the user guide</a>
+          <a class="btn ghost" href="https://github.com/danielbartl/wicket-testkit">View on GitHub</a>
+        </div>
+        <ul class="facts">
+          <li>Wicket 10</li>
+          <li>Java 17+</li>
+          <li>test scope</li>
+          <li>no extra dependencies</li>
+          <li>Apache 2.0</li>
+        </ul>
+      </div>
+      <div class="code">
+        <div class="bar"><span class="name">OrdersPageTest.java</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="java">// before: paths that break on the next refactoring
+tester.assertLabel("orders:1:customer", "Globex");
+tester.clickLink("orders:1:ship");
+
+// after: say what you mean
+var kit = WicketTestkit.of(tester);
+
+kit.assertLabel(locate(Label.class).withId("customer")
+    .inRowOf(globex), "Globex");
+kit.click(locate(AjaxLink.class).withId("ship").inRowOf(globex));</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <section id="demo" aria-labelledby="demo-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Why</p>
+        <h2 id="demo-title">Paths break. Locators don&#8217;t.</h2>
+        <p>Here is a page with three orders, and two checks of the same label. Change the page the way real pages
+          change, and watch which check still finds Globex.</p>
+      </div>
+      <div class="layout">
+        <div>
+          <div class="changes" role="group" aria-label="Change the page">
+            <button type="button" data-change="wrapped" aria-pressed="false">Wrap the list in a container</button>
+            <button type="button" data-change="sorted" aria-pressed="false">Sort the orders by customer</button>
+            <button type="button" data-reset>Reset</button>
+          </div>
+          <div class="check">
+            <p class="label">With a path</p>
+            <pre><code>tester.assertLabel("orders:1:customer", "Globex");</code></pre>
+            <p class="verdict good" data-verdict="path" aria-live="polite"><b>Passes:</b> row 1 shows Globex, for now.</p>
+          </div>
+          <div class="check">
+            <p class="label">With a locator</p>
+            <pre><code>kit.assertLabel(locate(Label.class).withId("customer")
+    .inRowOf(globex), "Globex");</code></pre>
+            <p class="verdict good" data-verdict="locator" aria-live="polite"><b>Passes:</b> finds Globex&#8217;s customer label at <code>orders:1:customer</code>.</p>
+          </div>
+        </div>
+        <div class="tree-box">
+          <p class="label">The page&#8217;s component tree</p>
+          <ul class="tree" aria-label="Component tree of OrdersPage"></ul>
+          <noscript><p class="demo-note">The tree needs JavaScript. Without it: wrapping the list makes the path
+            <code>orders:1:customer</code> point nowhere, sorting makes it point at an ACME order, and the locator
+            finds Globex either way.</p></noscript>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2 id="how-title">Locate, resolve, act.</h2>
+        <p>A thin layer over WicketTester. Every method finds exactly one component and hands it to the WicketTester
+          method you know, so Wicket&#8217;s behaviour stays exactly as it is.</p>
+      </div>
+      <ol class="steps">
+        <li>
+          <h3>Locate by what it is</h3>
+          <p>A <code>Locator</code> starts with a type and narrows down: id, model object, visible, enabled, inside
+            another component, in the row of an element, or any predicate. It is immutable, so page objects can keep
+            it and refine it.</p>
+          <div class="code"><pre><code data-lang="java">locate(Label.class)
+    .withId("customer")
+    .inRowOf(order)</code></pre></div>
+        </li>
+        <li>
+          <h3>Resolve exactly one</h3>
+          <p>On the page the tester rendered last. If nothing or several components match, you get an
+            <code>AssertionError</code> that says what was searched, what was found, and which components almost
+            matched.</p>
+          <div class="code"><pre><code data-lang="java">Label label = kit.one(customer);
+List&lt;Label&gt; all = customer.all(page);</code></pre></div>
+        </li>
+        <li>
+          <h3>Act through WicketTester</h3>
+          <p><code>click</code> is <code>clickLink</code>, <code>ajax</code> is <code>executeAjaxEvent</code>,
+            <code>form</code> is a <code>FormTester</code>, <code>assertLabel</code> is <code>assertLabel</code>.
+            Nothing is re-implemented, and your tester stays usable as before.</p>
+          <div class="code"><pre><code data-lang="java">kit.click(ship);
+kit.assertLabel(status, "shipped");
+kit.assertOnAjaxResponse(status);</code></pre></div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="messages" aria-labelledby="messages-title">
+    <div class="wrap split">
+      <div class="section-head">
+        <p class="eyebrow">Failure messages</p>
+        <h2 id="messages-title">When a test fails, it says why.</h2>
+        <p>Failure messages are part of the design, specified and tested like everything else.</p>
+        <ul class="points">
+          <li><strong>Near misses.</strong> Nothing matched? You see the components that met every criterion but one,
+            and what differs. A component of another type, or a hidden one, comes first.</li>
+          <li><strong>Several matches.</strong> Every path, so you know which refinement to add.</li>
+          <li><strong>Context for WicketTester&#8217;s failures.</strong> The locator and the component&#8217;s path go in
+            front. Expected and actual are kept, so your IDE still shows its diff.</li>
+        </ul>
+      </div>
+      <div class="messages">
+        <figure>
+          <div class="message"><pre>Expected exactly one match for a Label with id <span class="em">"customr"</span> in the row of Order[id=42, customer=Globex] in OrdersPage, but found none.
+Near misses (all criteria but one):
+  - orders:1:customer <span class="ok">(has id "customer")</span>
+  - orders:1:status <span class="ok">(has id "status")</span></pre></div>
+          <figcaption>A typo in the id: the near misses show the ids that exist in that row.</figcaption>
+        </figure>
+        <figure>
+          <div class="message"><pre>Expected exactly one match for an AjaxLink with id "ship" in OrdersPage, but found 3:
+  - orders:0:ship
+  - orders:1:ship
+  - orders:2:ship</pre></div>
+          <figcaption>Every row has a ship link. Add <code>inRowOf(order)</code>.</figcaption>
+        </figure>
+        <figure>
+          <div class="message"><pre>a Label with id "customer" in the row of Order[id=42, customer=Globex] (at orders:1:customer): expected: &lt;ACME&gt; but was: &lt;Globex&gt;</pre></div>
+          <figcaption>WicketTester&#8217;s own failure, with the locator and the path in front.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="forms" aria-labelledby="forms-title">
+    <div class="wrap split">
+      <div class="section-head">
+        <p class="eyebrow">Forms</p>
+        <h2 id="forms-title">Fill in forms by field, not by form-relative path.</h2>
+        <p><code>kit.form(…)</code> wraps a <code>FormTester</code> and finds fields and buttons inside that form,
+          however deep they are nested.</p>
+        <ul class="points">
+          <li><strong>Ajax included.</strong> Submitting through an <code>AjaxButton</code> uses Ajax, and the form
+            helper&#8217;s <code>ajax</code> sends the values set so far, so an updating behavior sees the new
+            input.</li>
+          <li><strong>No silent losses.</strong> A disabled or hidden field fails instead of dropping your value.</li>
+          <li><strong>Step by step.</strong> Within one request, <code>kit.form(…)</code> returns the same helper, so a
+            page object can fill a form across several methods.</li>
+        </ul>
+      </div>
+      <div class="code">
+        <div class="bar"><span class="name">CheckoutTest.java</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
+    .set(locate(TextField.class).withId("customer"), "Globex")
+    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .submit(locate(AjaxButton.class).withId("save"));
+
+kit.assertFeedback(locate(FeedbackPanel.class).visible(), "Order saved.");
+
+// an AjaxFormComponentUpdatingBehavior, with the new value
+kit.form(locate(Form.class).withId("order"))
+    .select(locate(DropDownChoice.class).withId("country"), 2)
+    .ajax(locate(DropDownChoice.class).withId("country"), "change");</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-objects" aria-labelledby="po-title">
+    <div class="wrap split">
+      <div class="section-head">
+        <p class="eyebrow">Page objects</p>
+        <h2 id="po-title">Tests in the words of your domain.</h2>
+        <p>Locators are values. Keep them in a page object, refine them per row, and your tests read like the
+          requirement they prove.</p>
+        <div class="code">
+          <div class="bar"><span class="name">ShippingTest.java</span></div>
+          <pre><code data-lang="java">ordersPage.rowOf(globex).ship();
+ordersPage.rowOf(globex).assertStatus("shipped");</code></pre>
+        </div>
+      </div>
+      <div class="code">
+        <div class="bar"><span class="name">OrdersPageObject.java</span><button class="copy" type="button">Copy</button></div>
+        <pre><code data-lang="java">class OrdersPageObject {
+
+    private final WicketTestkit kit;
+
+    OrdersPageObject(WicketTestkit kit) {
+        this.kit = kit;
+    }
+
+    Row rowOf(Order order) {
+        return new Row(order);
+    }
+
+    class Row {
+
+        private final Order order;
+
+        Row(Order order) {
+            this.order = order;
+        }
+
+        void ship() {
+            kit.click(locate(AjaxLink.class).withId("ship").inRowOf(order));
+        }
+
+        void assertStatus(String status) {
+            kit.assertLabel(locate(Label.class).withId("status").inRowOf(order), status);
+        }
+    }
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" aria-labelledby="install-title">
+    <div class="wrap split install">
+      <div class="section-head">
+        <p class="eyebrow">Install</p>
+        <h2 id="install-title">One test dependency.</h2>
+        <p>wicket-testkit uses the <code>wicket-core</code> and <code>wicket-tester</code> your project already has,
+          so your Wicket version wins. Wicket 10, Java 17 or newer.</p>
+        <p class="status-note">Not released yet: 0.1.0 is on its way to Maven Central.</p>
+      </div>
+      <div>
+        <div class="tabbed" data-tabs>
+          <div class="tablist" role="tablist" aria-label="Build tool">
+            <button role="tab" id="tab-maven" aria-controls="panel-maven" aria-selected="true">Maven</button>
+            <button role="tab" id="tab-gradle" aria-controls="panel-gradle" aria-selected="false" tabindex="-1">Gradle</button>
+          </div>
+          <div id="panel-maven" role="tabpanel" aria-labelledby="tab-maven">
+            <div class="code">
+              <div class="bar"><span class="name">pom.xml</span><button class="copy" type="button">Copy</button></div>
+              <pre><code data-lang="xml">&lt;dependency&gt;
+    &lt;groupId&gt;dev.jbaby&lt;/groupId&gt;
+    &lt;artifactId&gt;wicket-testkit&lt;/artifactId&gt;
+    &lt;version&gt;0.1.0&lt;/version&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+            </div>
+          </div>
+          <div id="panel-gradle" role="tabpanel" aria-labelledby="tab-gradle" hidden>
+            <div class="code">
+              <div class="bar"><span class="name">build.gradle.kts</span><button class="copy" type="button">Copy</button></div>
+              <pre><code data-lang="kotlin">testImplementation("dev.jbaby:wicket-testkit:0.1.0")</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="code">
+          <div class="bar"><span class="name">Your first test</span><button class="copy" type="button">Copy</button></div>
+          <pre><code data-lang="java">import static dev.jbaby.wicket.testkit.locator.Locator.locate;
+
+import dev.jbaby.wicket.testkit.WicketTestkit;
+
+class OrdersPageTest {
+
+    WicketTester tester = new WicketTester(new MyApplication());
+    WicketTestkit kit = WicketTestkit.of(tester);
+
+    @Test
+    void showsTheTitle() {
+        tester.startPage(OrdersPage.class);
+
+        kit.assertLabel(locate(Label.class).withId("title"), "Orders");
+    }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="limits" aria-labelledby="limits-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Before you rely on it</p>
+        <h2 id="limits-title">What to know.</h2>
+      </div>
+      <ul class="limits">
+        <li><strong>Exactly one, always.</strong> Actions and assertions need exactly one match. Narrow with
+          <code>visible()</code>, <code>inside</code> or <code>inRowOf</code>; use <code>assertCount</code> for
+          &#8220;none&#8221;.</li>
+        <li><strong>The last rendered page.</strong> Locators are resolved against the page the tester rendered last.
+          To search a part of it, use <code>inside</code>.</li>
+        <li><strong>Rows are list items.</strong> <code>inRowOf</code> covers <code>ListView</code>,
+          <code>RefreshingView</code> and <code>DataView</code>. For entities that only equal themselves, match the
+          row with a predicate.</li>
+        <li><strong>Test scope only.</strong> Production code that walks the component tree should use Wicket&#8217;s
+          own <code>visitChildren</code>.</li>
+        <li><strong>A component under test.</strong> After <code>startComponentInPage</code>, everything inside the
+          component can be located, but not the component itself.</li>
+        <li><strong>Wicket 10.</strong> Wicket 9 and older are not supported; Wicket 11 will follow.</li>
+      </ul>
+      <p class="demo-note">All the details, and the reasons, are in the <a href="guide.html#limits">user guide</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <h2>wicket-testkit</h2>
+      <p>Test helpers for Apache Wicket 10. Apache License 2.0.</p>
+      <p><code>dev.jbaby:wicket-testkit</code></p>
+    </div>
+    <div>
+      <h2>Read</h2>
+      <ul>
+        <li><a href="guide.html">User guide</a></li>
+        <li><a href="https://github.com/danielbartl/wicket-testkit">Source on GitHub</a></li>
+        <li><a href="https://github.com/danielbartl/wicket-testkit/issues">Issues</a></li>
+      </ul>
+    </div>
+    <div>
+      <h2>Credits</h2>
+      <p>Builds on the idea of <a href="https://github.com/otto-de/enhanced-wickettester">otto-de/enhanced-wickettester</a>,
+        rewritten from scratch for Wicket 10. The word &#8220;locator&#8221; is borrowed from
+        <a href="https://playwright.dev/">Playwright</a>. Apache Wicket is a trademark of the Apache Software
+        Foundation; this project is not part of it.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>
