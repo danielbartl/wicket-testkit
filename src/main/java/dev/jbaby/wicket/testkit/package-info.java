@@ -127,6 +127,10 @@
 ///   _(why: WicketTester looks these components up as visible only, and fails with a
 ///   `NullPointerException` or "does not exist" otherwise)_
 ///
+/// ### R8: Path for other WicketTester methods
+/// - R8.1 — When `pathOf` is called, the testkit shall return the located component's
+///   page-relative path, which the tester's own methods accept.
+///
 /// A complete message, for a label whose text differs:
 ///
 /// ```

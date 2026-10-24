@@ -2,6 +2,9 @@ package dev.jbaby.wicket.testkit;
 
 import dev.jbaby.wicket.testkit.locator.Locator;
 import java.io.Serializable;
+import java.util.Objects;
+import org.apache.wicket.Component;
+import org.apache.wicket.Page;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
@@ -26,7 +29,10 @@ import org.apache.wicket.util.tester.WicketTester;
 /// component was found, its path.
 public final class WicketTestkit {
 
-    private WicketTestkit() {
+    private final WicketTester tester;
+
+    private WicketTestkit(WicketTester tester) {
+        this.tester = tester;
     }
 
     /// Wraps a tester. The testkit always works on the page the tester rendered last.
@@ -38,7 +44,7 @@ public final class WicketTestkit {
     /// @param tester the tester to act and assert through
     /// @return a testkit for that tester
     public static WicketTestkit of(WicketTester tester) {
-        throw new UnsupportedOperationException("not implemented yet");
+        return new WicketTestkit(notNull(tester, "tester"));
     }
 
     /// Clicks a link, through Ajax if it is an Ajax link, as `WicketTester.clickLink` does.
@@ -49,7 +55,8 @@ public final class WicketTestkit {
     ///
     /// @param link the locator of the link
     public void click(Locator<?> link) {
-        throw new UnsupportedOperationException("not implemented yet");
+        var component = locateVisible(notNull(link, "link"));
+        check(link, component, () -> tester.clickLink(component));
     }
 
     /// Fires an Ajax event on a component, as `WicketTester.executeAjaxEvent` does.
@@ -62,6 +69,8 @@ public final class WicketTestkit {
     /// @param event the event, such as `click` or `change`
     /// @throws AssertionError also if the component has no Ajax behavior for the event
     public void ajax(Locator<?> component, String event) {
+        notNull(component, "component");
+        notNull(event, "event");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -77,6 +86,7 @@ public final class WicketTestkit {
     /// @param form the locator of the form
     /// @return a helper that locates fields and buttons inside that form
     public FormHelper form(@SuppressWarnings("rawtypes") Locator<? extends Form> form) {
+        notNull(form, "form");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -89,7 +99,9 @@ public final class WicketTestkit {
     /// @param label the locator of the label
     /// @param expectedText the text the label should show
     public void assertLabel(Locator<? extends Label> label, String expectedText) {
-        throw new UnsupportedOperationException("not implemented yet");
+        notNull(expectedText, "expectedText");
+        var component = locateVisible(notNull(label, "label"));
+        check(label, component, () -> tester.assertLabel(component.getPageRelativePath(), expectedText));
     }
 
     /// Asserts that a component is visible in hierarchy, as `WicketTester.assertVisible` does.
@@ -100,6 +112,7 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertVisible(Locator<?> component) {
+        notNull(component, "component");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -113,6 +126,7 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertInvisible(Locator<?> component) {
+        notNull(component, "component");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -124,6 +138,7 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertEnabled(Locator<?> component) {
+        notNull(component, "component");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -136,6 +151,7 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertDisabled(Locator<?> component) {
+        notNull(component, "component");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -148,6 +164,8 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     /// @param expected the model object it should have, compared with `equals`
     public void assertModelObject(Locator<?> component, Object expected) {
+        notNull(component, "component");
+        notNull(expected, "expected");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -161,6 +179,8 @@ public final class WicketTestkit {
     /// @param expectedMessages every message the panel should show, in any order
     public void assertFeedback(Locator<? extends FeedbackPanel> panel,
             Serializable... expectedMessages) {
+        notNull(panel, "panel");
+        notNull(expectedMessages, "expectedMessages");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -174,6 +194,7 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertOnAjaxResponse(Locator<?> component) {
+        notNull(component, "component");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -187,6 +208,8 @@ public final class WicketTestkit {
     /// @param locator the locator
     /// @param expected how many components it should match, zero included
     public void assertCount(Locator<?> locator, int expected) {
+        notNull(locator, "locator");
+        page();
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -200,6 +223,48 @@ public final class WicketTestkit {
     /// @param locator the locator
     /// @return the path, as `WicketTester` takes it
     public String pathOf(Locator<?> locator) {
-        throw new UnsupportedOperationException("not implemented yet");
+        return locate(notNull(locator, "locator")).getPageRelativePath();
+    }
+
+    /// The page the tester rendered last.
+    private Page page() {
+        var page = tester.getLastRenderedPage();
+        if (page == null) {
+            throw new AssertionError("The tester has not rendered a page yet.");
+        }
+        return page;
+    }
+
+    /// The one component the locator matches on the last rendered page.
+    private Component locate(Locator<?> locator) {
+        return locator.one(page());
+    }
+
+    /// The one component the locator matches, which has to be visible in hierarchy, because
+    /// WicketTester only looks up visible components by path.
+    private Component locateVisible(Locator<?> locator) {
+        var component = locate(locator);
+        if (!component.isVisibleInHierarchy()) {
+            throw new AssertionError(prefix(locator, component) + "the component is not visible in hierarchy");
+        }
+        return component;
+    }
+
+    /// Runs a WicketTester check for the component and puts the prefix in front of its failure.
+    private static void check(Locator<?> locator, Component component, Runnable check) {
+        try {
+            check.run();
+        } catch (AssertionError failure) {
+            throw new AssertionError(prefix(locator, component) + failure.getMessage(), failure);
+        }
+    }
+
+    /// The locator's description and the component's path, to start a failure message with.
+    static String prefix(Locator<?> locator, Component component) {
+        return locator + " (at " + component.getPageRelativePath() + "): ";
+    }
+
+    static <V> V notNull(V value, String parameter) {
+        return Objects.requireNonNull(value, () -> parameter + " must not be null");
     }
 }
