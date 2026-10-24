@@ -6,7 +6,7 @@
 | Base package | `dev.jbaby.wicket.testkit` |
 | Repository | `wicket-testkit` |
 | First version | `0.1.0-SNAPSHOT` |
-| Status | new project |
+| Status | M0 to M6 done; release (M7) pending |
 
 ## Purpose
 
