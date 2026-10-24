@@ -18,8 +18,9 @@
 /// - `wrap`: wrap a WicketTester (`WicketTestkit.of`)
 /// - `click`: click a link (`WicketTestkit.click`)
 /// - `fire-ajax-event`: fire an Ajax event on a component (`WicketTestkit.ajax`)
-/// - `fill-in-form`: set field values and submit a form (`WicketTestkit.form`,
-///   `FormHelper.set`, `FormHelper.select`, `FormHelper.submit`)
+/// - `fill-in-form`: set field values, fire Ajax events with them and submit a form
+///   (`WicketTestkit.form`, `FormHelper.set`, `FormHelper.select`, `FormHelper.ajax`,
+///   `FormHelper.submit`, and `FormHelper.formTester` for anything else)
 /// - `assert`: assert about one component (`WicketTestkit.assertLabel`, `assertVisible`,
 ///   `assertInvisible`, `assertEnabled`, `assertDisabled`, `assertModelObject`,
 ///   `assertFeedback`, `assertOnAjaxResponse`)
@@ -60,16 +61,17 @@
 ///   `WicketTester.clickLink` does.
 /// - R3.3 — When `ajax` is called with an event, the testkit shall fire that event on the
 ///   located component as `WicketTester.executeAjaxEvent` does.
-/// - R3.4 — If the located component has no Ajax behavior for the event, then `ajax` shall
-///   throw an `AssertionError` whose message is the prefix followed by
+/// - R3.4 — If the located component has no Ajax behavior for the event, then `ajax`, of the
+///   testkit or of the form helper, shall throw an `AssertionError` whose message is the prefix
+///   followed by
 ///   `the component has no Ajax behavior for the event "<event>"`.
 ///   _(why: `WicketTester.executeAjaxEvent` silently does nothing then)_
 ///
 /// ### R4: Fill in a form
 /// - R4.1 — When `form` is called, the testkit shall return a form helper for the located form
 ///   that starts from the form's current values, as `WicketTester.newFormTester` does.
-/// - R4.2 — The form helper shall locate fields and buttons among the form's descendants only,
-///   at any depth.
+/// - R4.2 — The form helper shall locate fields, buttons and other components among the form's
+///   descendants only, at any depth.
 /// - R4.3 — When `set` is called, the form helper shall set the located field's input as
 ///   `FormTester.setValue` does.
 /// - R4.4 — When `select` is called, the form helper shall select the choice at the given index
@@ -80,11 +82,31 @@
 ///   the located button as `FormTester.submit` does.
 /// - R4.7 — Where the located button is an `AjaxButton` or an `AjaxSubmitLink`, the form helper
 ///   shall submit the form through Ajax with the values set so far.
-/// - R4.8 — If the located field is not enabled in hierarchy, then `set` and `select` shall
-///   throw an `AssertionError` whose message is the prefix followed by
-///   `the component is not enabled in hierarchy`.
+/// - R4.8 — If the located field or button is not enabled in hierarchy, then `set`, `select`
+///   and `submit` with a button shall throw an `AssertionError` whose message is the prefix
+///   followed by `the component is not enabled in hierarchy`.
 ///   _(why: Wicket ignores the input of a disabled field, so the value would be lost without
-///   a word)_
+///   a word, and nobody can click a disabled button, though FormTester submits through it)_
+/// - R4.9 — When `form` is called again for the same form before the tester has handled
+///   another request, the testkit shall return the same form helper, with the values set so far.
+///   _(why: a second FormTester would add the form's current values to the request again, and
+///   which value wins would be left to chance)_
+/// - R4.10 — If the tester has handled a request since the form helper was created, then the
+///   form helper's methods shall throw an `AssertionError` whose message is the form's prefix
+///   followed by
+///   `the tester has handled a request since this form helper was created; call form again`.
+///   _(why: the values a FormTester set are gone after a request, also after an Ajax submit)_
+/// - R4.11 — If the located field has a `FormComponentUpdatingBehavior`, then `select` shall
+///   throw an `AssertionError` whose message is the prefix followed by
+///   `the component has a FormComponentUpdatingBehavior, which FormTester would run at once,
+///   losing the values set so far; use formTester() to select it anyway`.
+///   _(why: `FormTester.select` sends a request of its own for that behavior)_
+/// - R4.12 — When `ajax` is called on the form helper with an event, the form helper shall fire
+///   that event on the located component with the values set so far, as
+///   `WicketTester.executeAjaxEvent` does.
+///   _(why: an `AjaxFormComponentUpdatingBehavior` reads the field's input from the request)_
+/// - R4.13 — When `formTester` is called, the form helper shall return its `FormTester`, with
+///   the values set so far.
 ///
 /// ### R5: Assert about one component
 /// - R5.1 — When `assertLabel` is called, the testkit shall check the located label's text as
@@ -121,9 +143,10 @@
 ///   shall let it through unchanged.
 ///   _(why: an exception from the application under test is not a failed assertion)_
 /// - R7.3 — If the located component is not visible in hierarchy, then `click`, `ajax`, `form`,
-///   `set`, `select`, `submit` with a button, `assertLabel`, `assertModelObject`,
-///   `assertEnabled`, `assertDisabled` and `assertFeedback` shall throw an `AssertionError`
-///   whose message is the prefix followed by `the component is not visible in hierarchy`.
+///   `set`, `select`, the form helper's `ajax`, `submit` with a button, `assertLabel`,
+///   `assertModelObject`, `assertEnabled`, `assertDisabled` and `assertFeedback` shall throw an
+///   `AssertionError` whose message is the prefix followed by
+///   `the component is not visible in hierarchy`.
 ///   _(why: WicketTester looks these components up as visible only, and fails with a
 ///   `NullPointerException` or "does not exist" otherwise)_
 ///

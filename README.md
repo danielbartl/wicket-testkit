@@ -83,7 +83,7 @@ WicketTestkit kit = WicketTestkit.of(tester);
 tester.startPage(OrdersPage.class);
 
 kit.click(locate(AjaxLink.class).withId("ship").inRowOf(order));                  // clickLink
-kit.ajax(locate(DropDownChoice.class).withId("country"), "change");               // executeAjaxEvent
+kit.ajax(locate(WebMarkupContainer.class).withId("row").inRowOf(order), "dblclick");  // executeAjaxEvent
 
 kit.assertLabel(locate(Label.class).withId("status").inRowOf(order), "shipped");  // assertLabel
 kit.assertOnAjaxResponse(locate(Label.class).withId("status").inRowOf(order));    // assertComponentOnAjaxResponse
@@ -116,6 +116,21 @@ kit.form(locate(Form.class).withId("order"))
 
 `submit()` submits without a button. `submit(button)` submits through the button, using Ajax if it
 is an `AjaxButton` or `AjaxSubmitLink`, as `FormTester` does.
+
+To fire an Ajax event on a field, such as "change" for an `AjaxFormComponentUpdatingBehavior`, use
+the form helper's `ajax`. It sends the values set so far, so the behavior sees the new input.
+(`kit.ajax` sends no form input, and would leave the field's model empty.)
+
+```java
+kit.form(locate(Form.class).withId("order"))
+    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .ajax(locate(DropDownChoice.class).withId("country"), "change");
+```
+
+A form helper lives for one request. Until the tester handles another one, `kit.form(...)` returns
+the same helper, so a page object can fill in a form step by step. After a submit, an Ajax event
+or any other request, call `kit.form(...)` again. For anything the helper doesn't offer, such as
+files or multiple selections, `formTester()` returns the `FormTester` behind it.
 
 ### Failure messages
 
@@ -213,6 +228,9 @@ This exact page object runs as a test in
   `PageableListView`), `RefreshingView` and `DataView`, whose `Item` extends `ListItem`.
   `Loop` items and plain `RepeatingView` children are not rows; use `inside` or `matching`
   for them.
+- **Fields that submit on change.** `select` fails on a field with a
+  `FormComponentUpdatingBehavior`, because `FormTester` would send a request for it at once and
+  lose the values set so far. Select it through `formTester()` if you mean it.
 - **Ajax fallback buttons.** `AjaxFallbackButton` extends `Button`, so `FormTester`, and with it
   `submit(button)`, submits through it without Ajax.
 - **`WicketTester`, not `BaseWicketTester`.** The assertions exist only on `WicketTester`.

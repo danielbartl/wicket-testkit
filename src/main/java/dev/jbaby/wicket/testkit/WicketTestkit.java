@@ -2,6 +2,8 @@ package dev.jbaby.wicket.testkit;
 
 import dev.jbaby.wicket.testkit.locator.Locator;
 import java.io.Serializable;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.apache.wicket.Component;
@@ -36,6 +38,9 @@ public final class WicketTestkit {
 
     private final WicketTester tester;
 
+    /// The latest form helper for each form; [FormHelper#isCurrent()] tells whether it still holds.
+    private final Map<Form<?>, FormHelper> formHelpers = new IdentityHashMap<>();
+
     private WicketTestkit(WicketTester tester) {
         this.tester = tester;
     }
@@ -67,8 +72,12 @@ public final class WicketTestkit {
     /// Fires an Ajax event on a component, as `WicketTester.executeAjaxEvent` does.
     ///
     /// ```java
-    /// kit.ajax(locate(DropDownChoice.class).withId("country"), "change");
+    /// kit.ajax(locate(WebMarkupContainer.class).withId("row").inRowOf(order), "dblclick");
     /// ```
+    ///
+    /// It sends no form input. For a form field with an `AjaxFormComponentUpdatingBehavior`, use
+    /// [FormHelper#ajax(Locator, String)], which sends the field's new input; this method would
+    /// leave the field's model empty.
     ///
     /// @param component the locator of the component
     /// @param event the event, such as `click` or `change`
@@ -76,10 +85,7 @@ public final class WicketTestkit {
     public void ajax(Locator<?> component, String event) {
         notNull(event, "event");
         var located = locateVisible(notNull(component, "component"));
-        if (WicketTesterHelper.findAjaxEventBehaviors(located, event).isEmpty()) {
-            throw new AssertionError(prefix(component, located)
-                + "the component has no Ajax behavior for the event \"" + event + "\"");
-        }
+        requireAjaxBehavior(component, located, event);
         check(component, located, () -> tester.executeAjaxEvent(located, event));
     }
 
@@ -96,8 +102,14 @@ public final class WicketTestkit {
     /// @return a helper that locates fields and buttons inside that form
     public FormHelper form(@SuppressWarnings("rawtypes") Locator<? extends Form> form) {
         var located = (Form<?>) locateVisible(notNull(form, "form"));
+        var current = formHelpers.get(located);
+        if (current != null && current.isCurrent()) {
+            return current;
+        }
         var formTester = checked(form, located, () -> tester.newFormTester(located.getPageRelativePath()));
-        return new FormHelper(form, located, formTester);
+        var helper = new FormHelper(tester, form, located, formTester);
+        formHelpers.put(located, helper);
+        return helper;
     }
 
     /// Asserts a label's text, as `WicketTester.assertLabel` does.
@@ -279,6 +291,15 @@ public final class WicketTestkit {
             throw new AssertionError(prefix(locator, component) + "the component is not visible in hierarchy");
         }
         return component;
+    }
+
+    /// Fails unless the component has an Ajax behavior for the event, where
+    /// `WicketTester.executeAjaxEvent` would silently do nothing.
+    static void requireAjaxBehavior(Locator<?> locator, Component component, String event) {
+        if (WicketTesterHelper.findAjaxEventBehaviors(component, event).isEmpty()) {
+            throw new AssertionError(prefix(locator, component)
+                + "the component has no Ajax behavior for the event \"" + event + "\"");
+        }
     }
 
     /// Runs a WicketTester check for the component and puts the prefix in front of its failure.

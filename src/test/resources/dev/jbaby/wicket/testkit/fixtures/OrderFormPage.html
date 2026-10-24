@@ -4,7 +4,11 @@
 <form wicket:id="order">
     <input type="text" wicket:id="customer">
     <div wicket:id="details"><select wicket:id="country"></select></div>
-    <div wicket:id="archived"><input type="text" wicket:id="note"> <select wicket:id="region"></select></div>
+    <select wicket:id="speed"></select>
+    <div wicket:id="archived">
+        <input type="text" wicket:id="note"> <select wicket:id="region"></select>
+        <input type="submit" wicket:id="restore" value="Restore">
+    </div>
     <div wicket:id="extra">
         <input type="text" wicket:id="coupon"> <select wicket:id="gift"></select>
         <input type="submit" wicket:id="apply" value="Apply">
@@ -14,6 +18,7 @@
     <a wicket:id="send">Send</a>
 </form>
 <p wicket:id="result"></p>
+<p wicket:id="shipping"></p>
 <form wicket:id="search"><input type="text" wicket:id="query"></form>
 <form wicket:id="hidden"></form>
 </body>
