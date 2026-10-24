@@ -190,6 +190,88 @@ class WicketTestkitTests {
     }
 
     @Nested
+    @DisplayName("R5 assert about one component")
+    class AssertAboutOneComponent {
+
+        final Locator<Label> globex = locate(Label.class).withId("customer").inRowOf(Order.GLOBEX_42);
+        final Locator<Label> title = locate(Label.class).withId("title");
+        final Locator<Label> secret = locate(Label.class).withId("secret");
+        final Locator<Link> boom = locate(Link.class).withId("boom");
+        final Locator<Link> frozen = locate(Link.class).withId("frozen");
+
+        @Test
+        @DisplayName("R5.1 assertLabel checks the label's text as WicketTester.assertLabel does")
+        void assertLabelChecksTheText() {
+            kit.assertLabel(globex, "Globex");
+
+            assertThatThrownBy(() -> kit.assertLabel(globex, "ACME")).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.2 assertVisible checks that the component is visible in hierarchy")
+        void assertVisibleChecksVisibility() {
+            kit.assertVisible(title);
+
+            assertThatThrownBy(() -> kit.assertVisible(secret)).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.3 assertInvisible checks that the component is not visible in hierarchy")
+        void assertInvisibleChecksInvisibility() {
+            kit.assertInvisible(secret);
+
+            assertThatThrownBy(() -> kit.assertInvisible(title)).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.4 assertEnabled checks that the component is enabled in hierarchy")
+        void assertEnabledChecksEnabledState() {
+            kit.assertEnabled(boom);
+
+            assertThatThrownBy(() -> kit.assertEnabled(frozen)).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.5 assertDisabled checks that the component is not enabled in hierarchy")
+        void assertDisabledChecksDisabledState() {
+            kit.assertDisabled(frozen);
+
+            assertThatThrownBy(() -> kit.assertDisabled(boom)).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.6 assertModelObject checks the model object as WicketTester.assertModelValue does")
+        void assertModelObjectChecksTheModelObject() {
+            kit.assertModelObject(title, "Orders");
+
+            assertThatThrownBy(() -> kit.assertModelObject(title, "Shop")).isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.7 assertFeedback checks the feedback panel's messages as WicketTester.assertFeedback does")
+        void assertFeedbackChecksTheMessages() {
+            var feedback = locate(FeedbackPanel.class).visible();
+            kit.click(locate(AjaxLink.class).withId("ship").inRowOf(Order.GLOBEX_42));
+
+            kit.assertFeedback(feedback, "Shipped order 42");
+
+            assertThatThrownBy(() -> kit.assertFeedback(feedback, "Shipped order 41"))
+                .isInstanceOf(AssertionError.class);
+        }
+
+        @Test
+        @DisplayName("R5.8 assertOnAjaxResponse checks that the last Ajax response rendered the component")
+        void assertOnAjaxResponseChecksTheResponse() {
+            kit.click(locate(AjaxLink.class).withId("ship").inRowOf(Order.GLOBEX_42));
+
+            kit.assertOnAjaxResponse(locate(Label.class).withId("status").inRowOf(Order.GLOBEX_42));
+
+            assertThatThrownBy(() -> kit.assertOnAjaxResponse(
+                locate(Label.class).withId("status").inRowOf(Order.ACME_41))).isInstanceOf(AssertionError.class);
+        }
+    }
+
+    @Nested
     @DisplayName("R8 path for other WicketTester methods")
     class PathForOtherWicketTesterMethods {
 

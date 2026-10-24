@@ -117,8 +117,8 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertVisible(Locator<?> component) {
-        notNull(component, "component");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locate(notNull(component, "component"));
+        check(component, located, () -> tester.assertVisible(located.getPageRelativePath()));
     }
 
     /// Asserts that a component is not visible in hierarchy, as `WicketTester.assertInvisible`
@@ -131,8 +131,8 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertInvisible(Locator<?> component) {
-        notNull(component, "component");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locate(notNull(component, "component"));
+        check(component, located, () -> tester.assertInvisible(located.getPageRelativePath()));
     }
 
     /// Asserts that a component is enabled in hierarchy, as `WicketTester.assertEnabled` does.
@@ -143,8 +143,8 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertEnabled(Locator<?> component) {
-        notNull(component, "component");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locateVisible(notNull(component, "component"));
+        check(component, located, () -> tester.assertEnabled(located.getPageRelativePath()));
     }
 
     /// Asserts that a component is not enabled in hierarchy, as `WicketTester.assertDisabled`
@@ -156,8 +156,8 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertDisabled(Locator<?> component) {
-        notNull(component, "component");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locateVisible(notNull(component, "component"));
+        check(component, located, () -> tester.assertDisabled(located.getPageRelativePath()));
     }
 
     /// Asserts a component's model object, as `WicketTester.assertModelValue` does.
@@ -169,9 +169,9 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     /// @param expected the model object it should have, compared with `equals`
     public void assertModelObject(Locator<?> component, Object expected) {
-        notNull(component, "component");
         notNull(expected, "expected");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locateVisible(notNull(component, "component"));
+        check(component, located, () -> tester.assertModelValue(located.getPageRelativePath(), expected));
     }
 
     /// Asserts the messages a feedback panel shows, as `WicketTester.assertFeedback` does.
@@ -184,9 +184,9 @@ public final class WicketTestkit {
     /// @param expectedMessages every message the panel should show, in any order
     public void assertFeedback(Locator<? extends FeedbackPanel> panel,
             Serializable... expectedMessages) {
-        notNull(panel, "panel");
         notNull(expectedMessages, "expectedMessages");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locateVisible(notNull(panel, "panel"));
+        check(panel, located, () -> tester.assertFeedback(located.getPageRelativePath(), expectedMessages));
     }
 
     /// Asserts that the last Ajax response rendered a component, as
@@ -199,8 +199,8 @@ public final class WicketTestkit {
     ///
     /// @param component the locator of the component
     public void assertOnAjaxResponse(Locator<?> component) {
-        notNull(component, "component");
-        throw new UnsupportedOperationException("not implemented yet");
+        var located = locate(notNull(component, "component"));
+        check(component, located, () -> tester.assertComponentOnAjaxResponse(located));
     }
 
     /// Asserts how many components a locator matches on the last rendered page.
