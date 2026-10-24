@@ -2,18 +2,23 @@ package dev.jbaby.wicket.testkit.locator;
 
 import static dev.jbaby.wicket.testkit.locator.Locator.locate;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.Headline;
 import dev.jbaby.wicket.testkit.fixtures.NoOpLink;
 import dev.jbaby.wicket.testkit.fixtures.Order;
 import dev.jbaby.wicket.testkit.fixtures.ShopPage;
 import dev.jbaby.wicket.testkit.fixtures.UserPanel;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.Page;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.model.IModel;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -164,6 +169,82 @@ class LocatorTests {
             assertThat(paths(locate(Label.class).inRowOf(Order.GLOBEX_42).all(page)))
                 .filteredOn(path -> path.startsWith("table:"))
                 .containsExactly("table:2:customer");
+        }
+    }
+
+    @Nested
+    @DisplayName("R4 combine refinements")
+    class CombineRefinements {
+
+        @Test
+        @DisplayName("R4.1 a locator matches only components that meet all its criteria")
+        void allCriteriaHaveToBeMet() {
+            assertThat(paths(locate(Label.class).withId("customer").withModelObject("ACME").all(page)))
+                .containsExactly("orders:0:customer", "orders:2:customer", "table:1:customer", "table:3:customer");
+            assertThat(locate(Label.class).withId("customer").withId("number").all(page)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("R4.2 refining returns a new locator and leaves the original unchanged")
+        void refiningLeavesTheOriginalUnchanged() {
+            var labels = locate(Label.class);
+            var title = labels.withId("title");
+
+            assertThat(title).isNotSameAs(labels);
+            assertThat(paths(title.all(page))).containsExactly("title");
+            assertThat(paths(labels.all(page))).contains("title", "headline", "user:name");
+        }
+
+        @Test
+        @DisplayName("R4.3 a null argument throws a NullPointerException that names the parameter")
+        void nullArgumentsAreRejected() {
+            var labels = locate(Label.class);
+
+            assertAll(
+                () -> assertThatNullPointerException().isThrownBy(() -> locate(null)).withMessageContaining("type"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.withId(null)).withMessageContaining("id"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.withModelObject(null))
+                    .withMessageContaining("modelObject"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.inside(null))
+                    .withMessageContaining("ancestor"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.inRowOf(null))
+                    .withMessageContaining("element"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.matching(null, "is bold"))
+                    .withMessageContaining("predicate"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.matching(label -> true, null))
+                    .withMessageContaining("description"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.one(null)).withMessageContaining("root"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.all(null)).withMessageContaining("root"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.existsIn(null))
+                    .withMessageContaining("root"));
+        }
+
+        @Test
+        @DisplayName("R4.4 model objects are read and predicates applied only for components of the locator's type")
+        void otherTypesAreNotAskedForTheirModel() {
+            var root = new WebMarkupContainer("root");
+            root.add(new WebMarkupContainer("broken", failingModel()));
+            root.add(new Label("customer", "ACME"));
+            var seen = new ArrayList<Component>();
+
+            assertThat(paths(locate(Label.class).withModelObject("ACME").all(root))).containsExactly("customer");
+            locate(Label.class).matching(seen::add, "is recorded").all(root);
+            assertThat(seen).hasSize(1).allMatch(Label.class::isInstance);
+        }
+
+        static IModel<String> failingModel() {
+            return () -> {
+                throw new IllegalStateException("this model must not be read");
+            };
+        }
+
+        @Test
+        @DisplayName("R4.5 matching with a blank description throws an IllegalArgumentException")
+        void blankDescriptionsAreRejected() {
+            var labels = locate(Label.class);
+
+            assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, ""));
+            assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, "  "));
         }
     }
 }

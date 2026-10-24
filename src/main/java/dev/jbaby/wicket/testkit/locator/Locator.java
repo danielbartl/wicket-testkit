@@ -48,7 +48,7 @@ public final class Locator<T extends Component> {
     /// @param <T> the type of the components to find
     /// @return a locator that matches every component of that type
     public static <T extends Component> Locator<T> locate(Class<T> type) {
-        return new Locator<>(Objects.requireNonNull(type, "type must not be null"), List.of());
+        return new Locator<>(notNull(type, "type"), List.of());
     }
 
     /// Narrows this locator down to components with a `wicket:id`.
@@ -60,7 +60,7 @@ public final class Locator<T extends Component> {
     /// @param id the `wicket:id`
     /// @return a new locator with this criterion added
     public Locator<T> withId(String id) {
-        return with(new Criterion.Id(id));
+        return with(new Criterion.Id(notNull(id, "id")));
     }
 
     /// Narrows this locator down to components whose model object equals the given one.
@@ -74,7 +74,7 @@ public final class Locator<T extends Component> {
     /// @param modelObject the model object, compared with `equals`
     /// @return a new locator with this criterion added
     public Locator<T> withModelObject(Object modelObject) {
-        return with(new Criterion.ModelObject(modelObject));
+        return with(new Criterion.ModelObject(notNull(modelObject, "modelObject")));
     }
 
     /// Narrows this locator down to components that are visible in hierarchy: they and all
@@ -111,7 +111,7 @@ public final class Locator<T extends Component> {
     /// @param ancestor the locator an ancestor has to match
     /// @return a new locator with this criterion added
     public Locator<T> inside(Locator<?> ancestor) {
-        return with(new Criterion.Inside(ancestor));
+        return with(new Criterion.Inside(notNull(ancestor, "ancestor")));
     }
 
     /// Narrows this locator down to components in the row of an element: inside a repeater item
@@ -125,7 +125,7 @@ public final class Locator<T extends Component> {
     /// @param element the element the row shows, compared with `equals`
     /// @return a new locator with this criterion added
     public Locator<T> inRowOf(Object element) {
-        return with(new Criterion.InRowOf(element));
+        return with(new Criterion.InRowOf(notNull(element, "element")));
     }
 
     /// Narrows this locator down to components that a predicate accepts. The description says
@@ -142,6 +142,10 @@ public final class Locator<T extends Component> {
     /// @return a new locator with this criterion added
     /// @throws IllegalArgumentException if the description is blank
     public Locator<T> matching(Predicate<? super T> predicate, String description) {
+        notNull(predicate, "predicate");
+        if (notNull(description, "description").isBlank()) {
+            throw new IllegalArgumentException("description must not be blank");
+        }
         @SuppressWarnings("unchecked") // matches() applies it to components of type T only
         var anyComponent = (Predicate<Component>) predicate;
         return with(new Criterion.Matching(anyComponent, description));
@@ -158,6 +162,7 @@ public final class Locator<T extends Component> {
     /// @throws AssertionError if no component or several match; the message names the criteria,
     ///     what was found and the near misses
     public T one(MarkupContainer root) {
+        notNull(root, "root");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -171,7 +176,7 @@ public final class Locator<T extends Component> {
     /// @return the matching components in tree order, empty if none matches
     public List<T> all(MarkupContainer root) {
         var matches = new ArrayList<T>();
-        root.visitChildren((component, visit) -> {
+        notNull(root, "root").visitChildren((component, visit) -> {
             if (matches(component)) {
                 matches.add(type.cast(component));
             }
@@ -188,6 +193,7 @@ public final class Locator<T extends Component> {
     /// @param root the page or container to search, not a candidate itself
     /// @return whether any component matches
     public boolean existsIn(MarkupContainer root) {
+        notNull(root, "root");
         throw new UnsupportedOperationException("not implemented yet");
     }
 
@@ -195,6 +201,10 @@ public final class Locator<T extends Component> {
         var more = new ArrayList<>(criteria);
         more.add(criterion);
         return new Locator<>(type, List.copyOf(more));
+    }
+
+    private static <V> V notNull(V value, String parameter) {
+        return Objects.requireNonNull(value, () -> parameter + " must not be null");
     }
 
     /// Whether the component meets every criterion of this locator.
