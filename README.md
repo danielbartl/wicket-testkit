@@ -1,6 +1,7 @@
 # wicket-testkit
 
 [![Build](https://github.com/danielbartl/wicket-testkit/actions/workflows/build.yml/badge.svg)](https://github.com/danielbartl/wicket-testkit/actions/workflows/build.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.jbaby/wicket-testkit)](https://central.sonatype.com/artifact/dev.jbaby/wicket-testkit)
 
 **[Website](https://danielbartl.github.io/wicket-testkit/)** &middot; **[User guide](https://danielbartl.github.io/wicket-testkit/guide.html)**
 
@@ -21,8 +22,6 @@ tester.clickLink("orders:1:ship");
 kit.assertLabel(locate(Label.class).withId("customer").inRowOf(order), "Globex");
 kit.click(locate(AjaxLink.class).withId("ship").inRowOf(order));
 ```
-
-> **Status:** in development, not released yet. The first release will be 0.1.0.
 
 ## Installation
 
