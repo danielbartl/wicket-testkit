@@ -94,11 +94,14 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus { opacity: 1; }
             <li><a href="#refinements">Refinements</a></li>
             <li><a href="#rows">Rows</a></li>
             <li><a href="#resolving">Resolving</a></li>
+            <li><a href="#labels">Labels</a></li>
             <li><a href="#descriptions">Descriptions</a></li>
+            <li><a href="#names">Names</a></li>
           </ol>
         </li>
         <li><a href="#acting">Clicking and Ajax</a></li>
         <li><a href="#asserting">Asserting</a></li>
+        <li><a href="#tables">Example tables</a></li>
         <li><a href="#forms">Forms</a>
           <ol>
             <li><a href="#forms-submit">Submitting</a></li>
@@ -120,7 +123,7 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus { opacity: 1; }
 
   <main class="doc">
     <header>
-      <p class="eyebrow">User guide · version 0.1.0</p>
+      <p class="eyebrow">User guide · version 0.2.0</p>
       <h1>Testing Wicket pages with locators</h1>
       <p>Everything about wicket-testkit: how to find components, act on them, fill in forms, read the failure
         messages and build page objects. It assumes you know Apache Wicket and its <code>WicketTester</code>.</p>
@@ -155,13 +158,13 @@ h2:hover .anchor, h3:hover .anchor, .anchor:focus { opacity: 1; }
       <pre><code data-lang="xml">&lt;dependency&gt;
     &lt;groupId&gt;dev.jbaby&lt;/groupId&gt;
     &lt;artifactId&gt;wicket-testkit&lt;/artifactId&gt;
-    &lt;version&gt;0.1.0&lt;/version&gt;
+    &lt;version&gt;0.2.0&lt;/version&gt;
     &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre>
     </div>
     <div class="code">
       <div class="bar"><span class="name">build.gradle.kts</span><button class="copy" type="button">Copy</button></div>
-      <pre><code data-lang="kotlin">testImplementation("dev.jbaby:wicket-testkit:0.1.0")</code></pre>
+      <pre><code data-lang="kotlin">testImplementation("dev.jbaby:wicket-testkit:0.2.0")</code></pre>
     </div>
     <p>It brings no dependencies of its own. It uses the <code>wicket-core</code> and <code>wicket-tester</code> your
       project already has, so your Wicket version wins. Since Wicket 10, the tester classes live in their own artifact,
@@ -214,8 +217,11 @@ kit.assertLabel(customer.inRowOf(globex), "Globex");</code></pre></div>
         <thead><tr><th>Refinement</th><th>Matches components</th></tr></thead>
         <tbody>
           <tr><td><code>withId("customer")</code></td><td>with this <code>wicket:id</code></td></tr>
+          <tr><td><code>withLabel("Customer")</code></td><td>with this label, as form fields have; see <a href="#labels">Labels</a></td></tr>
           <tr><td><code>withModelObject("ACME")</code></td><td>whose model object <code>equals</code> the argument;
             <code>null</code> matches components whose model object is <code>null</code></td></tr>
+          <tr><td><code>withModelObject(Order.class, predicate, "…")</code></td><td>whose model object is of that type
+            and passes the predicate</td></tr>
           <tr><td><code>visible()</code></td><td>that are visible in hierarchy: they and all their parents are visible</td></tr>
           <tr><td><code>enabled()</code></td><td>that are enabled in hierarchy</td></tr>
           <tr><td><code>inside(otherLocator)</code></td><td>with an ancestor that the other locator matches, anywhere above them</td></tr>
@@ -229,16 +235,19 @@ kit.assertLabel(customer.inRowOf(globex), "Globex");</code></pre></div>
       show it; it completes the sentence &#8220;a TextField that &#8230;&#8221;:</p>
     <div class="code"><pre><code data-lang="java">locate(TextField.class).matching(FormComponent::isRequired, "is required")
 locate(Label.class).matching(label -&gt; label.getDefaultModelObjectAsString().isBlank(), "is empty")</code></pre></div>
+    <p>The forms with a type and a predicate, of <code>withModelObject</code> and <code>inRowOf</code>, are for
+      objects without a useful <code>equals</code>, such as entities. A primitive type stands for its wrapper:
+      <code>int.class</code> matches <code>Integer</code> model objects.</p>
     <p><code>inside</code> takes another locator, so you can scope a search to a panel, a form or a dialog:</p>
     <div class="code"><pre><code data-lang="java">locate(Button.class).withId("save").inside(locate(Panel.class).withId("address"))</code></pre></div>
     <p>A locator doesn&#8217;t filter by visibility unless you call <code>visible()</code>. That way the same locator
       works for asserting that something is hidden. When a page has the same component twice, once hidden, add
       <code>visible()</code> to pick the one that shows.</p>
     <div class="note">
-      <p><strong>Model objects and predicates come last.</strong> A locator reads a component&#8217;s model object, and
-        runs your predicate on it, only once the component has met the type and every other criterion, whatever order
-        you wrote them in. Models of unrelated components are never loaded, and a predicate only sees the components
-        it was written for.</p>
+      <p><strong>Model objects, labels and predicates come last.</strong> A locator reads a component&#8217;s model
+        object or label, and runs your predicate on it, only once the component has met the type and every other
+        criterion, whatever order you wrote them in. Models of unrelated components are never loaded, and a predicate
+        only sees the components it was written for.</p>
       <p>A model object that can&#8217;t be read doesn&#8217;t match. That happens under a
         <code>CompoundPropertyModel</code>, which gives every component without a model of its own a model for the
         property of its id; if the object has no such property, reading it throws.</p>
@@ -257,7 +266,9 @@ locate(Label.class).matching(label -&gt; label.getDefaultModelObjectAsString().i
     <div class="code"><pre><code data-lang="java">locate(Label.class).withId("customer")
     .inRowOf(Order.class, o -&gt; o.getId().equals(orderId), "has id " + orderId)</code></pre></div>
     <p>Items of <code>Loop</code> and the children of a plain <code>RepeatingView</code> are not rows. Locate them
-      with <code>inside</code> or <code>matching</code>.</p>
+      with <code>inside</code> or <code>matching</code>. A child without a model of its own would take one from a
+      <code>CompoundPropertyModel</code> above it as soon as its model is read, which would change the page and could
+      match the wrong row.</p>
 
     <h3 id="resolving">Resolving<a class="anchor" href="#resolving" aria-label="Link to this section">#</a></h3>
     <p>The testkit resolves locators for you. To use a locator on its own, for example in a helper that gets a
@@ -275,6 +286,21 @@ locate(Label.class).matching(label -&gt; label.getDefaultModelObjectAsString().i
     <p>The locating layer, <code>dev.jbaby.wicket.testkit.locator</code>, uses nothing from wicket-tester, so it works
       on any component tree.</p>
 
+    <h3 id="labels">Labels<a class="anchor" href="#labels" aria-label="Link to this section">#</a></h3>
+    <p><code>withLabel</code> finds a form field by its label, the way a user reads the form. The label is the one
+      Wicket uses in feedback messages: set with <code>setLabel</code>, or taken from a <code>&lt;wicket:label&gt;</code>
+      in the markup.</p>
+    <div class="code"><pre><code data-lang="html">&lt;label wicket:for="customer"&gt;&lt;wicket:label&gt;Customer&lt;/wicket:label&gt;&lt;/label&gt;
+&lt;input type="text" wicket:id="customer"&gt;</code></pre></div>
+    <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
+    .set(locate(TextField.class).withLabel("Customer"), "Globex");</code></pre></div>
+    <p>Whitespace at either end doesn&#8217;t count, and every run of whitespace, non-breaking spaces included, counts
+      as one space, so a label spread over lines in the markup still matches. A label matches as it is written, and
+      also as text: <code>Terms &amp;amp; &lt;b&gt;conditions&lt;/b&gt;</code> matches &#8220;Terms &amp;
+      conditions&#8221;.</p>
+    <div class="note warn"><p>A plain <code>&lt;label wicket:for&gt;</code> without <code>&lt;wicket:label&gt;</code>
+      sets no label, so <code>withLabel</code> can&#8217;t find its field.</p></div>
+
     <h3 id="descriptions">Descriptions<a class="anchor" href="#descriptions" aria-label="Link to this section">#</a></h3>
     <p>A locator describes itself in plain words, and every failure message uses that description.
       <code>toString()</code> returns it.</p>
@@ -284,8 +310,20 @@ locate(Label.class).matching(label -&gt; label.getDefaultModelObjectAsString().i
 locate(Button.class).visible().enabled().inside(locate(Panel.class).withId("address"))
 // a visible, enabled Button inside a Panel with id "address"</code></pre></div>
     <p>The parts always come in the same order: <code>visible</code> and <code>enabled</code> before the type, then id,
-      model object, <code>matching</code> descriptions, <code>inside</code> and row. Strings are quoted, other values
-      appear as <code>String.valueOf</code> shows them, so give your row elements a readable <code>toString</code>.</p>
+      label, model object, <code>matching</code> descriptions, <code>inside</code> and row. Strings are quoted, other
+      values appear as <code>String.valueOf</code> shows them, so give your row elements a readable
+      <code>toString</code>. A value whose <code>toString</code> throws, like an entity outside its session, appears as
+      &#8220;an Order whose toString throws&#8221;.</p>
+
+    <h3 id="names">Names<a class="anchor" href="#names" aria-label="Link to this section">#</a></h3>
+    <p>Give a locator a name in your domain&#8217;s words with <code>named</code>. Its description, and so every
+      failure message, starts with that name and still says what was searched:</p>
+    <div class="code"><pre><code data-lang="java">locate(AjaxLink.class).withId("ship").inRowOf(order).named("the Ship button of order 42")
+// the Ship button of order 42, an AjaxLink with id "ship" in the row of Order[id=42, customer=Globex]</code></pre></div>
+    <div class="message"><pre>Expected exactly one match for the Ship button of order 42, an AjaxLink with id "ship" in the row of Order[id=42, customer=Globex] in OrdersPage, but found none.</pre></div>
+    <p>A name changes nothing about what a locator matches. Refining a named locator returns one without the name,
+      because the name no longer fits it. Inside another locator&#8217;s description, a named locator shows only its
+      name: <code>a Label with id "total" inside the order summary</code>.</p>
 
     <h2 id="acting">Clicking and Ajax<a class="anchor" href="#acting" aria-label="Link to this section">#</a></h2>
     <dl>
@@ -317,6 +355,7 @@ kit.ajax(locate(WebMarkupContainer.class).withId("row").inRowOf(order), "dblclic
           <tr><td><code>assertDisabled(c)</code></td><td><code>assertDisabled</code></td><td>not enabled in hierarchy</td></tr>
           <tr><td><code>assertModelObject(c, value)</code></td><td><code>assertModelValue</code></td><td>the model object; <code>null</code> for none</td></tr>
           <tr><td><code>assertFeedback(panel, "msg"…)</code></td><td><code>assertFeedback</code></td><td>a feedback panel shows these messages, in any order</td></tr>
+          <tr><td><code>assertFeedbackOn(c, "msg"…)</code></td><td><code>assertFeedbackMessages</code></td><td>a component, such as a field, has exactly these feedback messages, in any order; none for none</td></tr>
           <tr><td><code>assertOnAjaxResponse(c)</code></td><td><code>assertComponentOnAjaxResponse</code></td><td>the last Ajax response rendered it</td></tr>
           <tr><td><code>assertCount(locator, n)</code></td><td>(its own)</td><td>exactly <code>n</code> components match, zero included</td></tr>
         </tbody>
@@ -327,6 +366,7 @@ kit.ajax(locate(WebMarkupContainer.class).withId("row").inRowOf(order), "dblclic
     <div class="code"><pre><code data-lang="java">kit.assertLabel(locate(Label.class).withId("total"), "42.00");
 kit.assertInvisible(locate(Link.class).withId("ship").inRowOf(shippedOrder));
 kit.assertFeedback(locate(FeedbackPanel.class).visible(), "Customer is required.");
+kit.assertFeedbackOn(locate(TextField.class).withId("customer"), "'Customer' is required.");
 kit.assertCount(locate(Label.class).withId("customer"), 3);</code></pre></div>
     <p><code>assertInvisible</code> needs the component to exist, hidden. To assert that nothing matches at all, use
       <code>assertCount(locator, 0)</code>.</p>
@@ -341,8 +381,46 @@ kit.assertCount(locate(Label.class).withId("customer"), 3);</code></pre></div>
     <div class="code"><pre><code data-lang="java">TextField&lt;?&gt; customer = kit.one(locate(TextField.class).withId("customer"));
 assertThat(customer.isRequired()).isTrue();
 
-tester.assertComponent(kit.pathOf(locate(Panel.class).withId("details")), DetailsPanel.class);
-tester.assertFeedbackMessages(new ComponentFeedbackMessageFilter(customer), "Customer is required.");</code></pre></div>
+tester.assertComponent(kit.pathOf(locate(Panel.class).withId("details")), DetailsPanel.class);</code></pre></div>
+
+    <h2 id="tables">Example tables<a class="anchor" href="#tables" aria-label="Link to this section">#</a></h2>
+    <p>A specification gives examples, often as a table. <code>assertRows</code> compares the rows of a repeater with
+      such a table. The header names the <code>wicket:id</code>s to read in every row; each further line holds what one
+      row should show, in the rows&#8217; order:</p>
+    <div class="code"><pre><code data-lang="java">kit.assertRows(locate(ListView.class).withId("orders"), """
+    | customer | status  |
+    | ACME     | open    |
+    | Globex   | shipped |
+    """);</code></pre></div>
+    <ul>
+      <li><strong>Cells read as a user reads them.</strong> A cell holds the component&#8217;s model object as Wicket
+        renders it, but without escaping markup, so <code>O'Brien &amp; Sons</code> is written as it reads. Whitespace
+        counts as a browser shows it, non-breaking spaces included.</li>
+      <li><strong>Hidden is empty.</strong> A row that isn&#8217;t visible in hierarchy is left out, and a hidden
+        component counts as an empty cell.</li>
+      <li><strong>Any depth.</strong> A column&#8217;s component may sit anywhere inside its row, but there has to be
+        exactly one with that id per row.</li>
+      <li><strong>Pipes.</strong> A <code>|</code> inside a cell is written <code>\|</code>, which is <code>\\|</code>
+        in a Java text block. Blank lines don&#8217;t count.</li>
+    </ul>
+    <p>When the rows differ, the testkit throws opentest4j&#8217;s <code>AssertionFailedError</code> with both tables,
+      every column padded to the same width, as its expected and actual values, so your IDE shows them side by side and
+      only the rows that differ stand out:</p>
+    <div class="message"><pre>a ListView with id "orders" (at orders): the rows differ
+expected:
+| customer | status  |
+| ACME     | open    |
+| Globex   | shipped |
+but was:
+| customer | status  |
+| ACME     | open    |
+| Globex   | open    |</pre></div>
+    <p>A row without a component for a column, or with several, fails with an <code>AssertionError</code> that names
+      the row: <code>row 2 (at orders:1) has no component with id "status"</code>. So does a component whose model
+      object can&#8217;t be read. A malformed table, such as a row with fewer cells than the header, is a mistake in the
+      test and throws an <code>IllegalArgumentException</code> that names the line.</p>
+    <div class="note warn"><p>A <code>DataTable</code> can&#8217;t be compared this way: its cells all have the id
+      <code>cell</code>, so a header can&#8217;t name them.</p></div>
 
     <h2 id="forms">Forms<a class="anchor" href="#forms" aria-label="Link to this section">#</a></h2>
     <p><code>kit.form(locator)</code> returns a <code>FormHelper</code> for the located form. It wraps a
@@ -350,11 +428,23 @@ tester.assertFeedbackMessages(new ComponentFeedbackMessageFilter(customer), "Cus
       component <em>inside that form</em>, however deep they are nested. You never write a form-relative path.</p>
     <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
     .set(locate(TextField.class).withId("customer"), "Globex")
-    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .choose(locate(DropDownChoice.class).withId("country"), "Germany")
+    .chooseAll(locate(CheckBoxMultipleChoice.class).withId("extras"), "insurance", "tracking")
+    .check(locate(CheckBox.class).withId("giftWrap"))
     .submit();</code></pre></div>
     <dl>
       <dt><code>set(field, "input")</code></dt>
       <dd>Sets a field&#8217;s input as a user would type it, as <code>FormTester.setValue</code> does.</dd>
+      <dt><code>choose(field, choice)</code></dt>
+      <dd>Selects the first of the field&#8217;s choices that <code>equals</code> the given one, as
+        <code>FormTester.select</code> does with its index. Reordered choices don&#8217;t break the test. A choice the
+        field doesn&#8217;t have fails, listing the ones it has, and says so when the classes differ, as for
+        <code>12L</code> among <code>Integer</code>s.</dd>
+      <dt><code>chooseAll(field, choices…)</code></dt>
+      <dd>Replaces the selection of a multiple choice, such as a <code>CheckBoxMultipleChoice</code>, with exactly
+        these choices; none clears it.</dd>
+      <dt><code>check(checkBox)</code> / <code>uncheck(checkBox)</code></dt>
+      <dd>Checks or unchecks a check box.</dd>
       <dt><code>select(field, index)</code></dt>
       <dd>Selects the choice at an index, from zero, as <code>FormTester.select</code> does.</dd>
       <dt><code>ajax(component, event)</code></dt>
@@ -362,7 +452,7 @@ tester.assertFeedbackMessages(new ComponentFeedbackMessageFilter(customer), "Cus
       <dt><code>submit()</code> / <code>submit(button)</code></dt>
       <dd>Submits the form, without or through a button.</dd>
       <dt><code>formTester()</code></dt>
-      <dd>The <code>FormTester</code> behind it, for files, multiple selections and check boxes as booleans.</dd>
+      <dd>The <code>FormTester</code> behind it, for files and anything else the helper doesn&#8217;t offer.</dd>
     </dl>
 
     <h3 id="forms-submit">Submitting<a class="anchor" href="#forms-submit" aria-label="Link to this section">#</a></h3>
@@ -381,7 +471,7 @@ kit.assertOnAjaxResponse(locate(FeedbackPanel.class).visible());</code></pre></d
     <p>An <code>AjaxFormComponentUpdatingBehavior</code> reads the field&#8217;s new input from the request. Set or
       select the value, then fire the event through the form helper:</p>
     <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
-    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .choose(locate(DropDownChoice.class).withId("country"), "Germany")
     .ajax(locate(DropDownChoice.class).withId("country"), "change");
 
 kit.assertLabel(locate(Label.class).withId("shipping"), "Shipping to Germany");</code></pre></div>
@@ -408,14 +498,15 @@ void save() {
     <h3 id="forms-guards">What fails, and why<a class="anchor" href="#forms-guards" aria-label="Link to this section">#</a></h3>
     <p>Where Wicket or FormTester would drop a value without a word, the form helper fails instead:</p>
     <ul>
-      <li><strong>A disabled field.</strong> Wicket ignores its input, so <code>set</code> and <code>select</code>
-        fail with <code>the component is not enabled in hierarchy</code>. So does <code>submit</code> through a
-        disabled button, which nobody could click.</li>
+      <li><strong>A disabled field.</strong> Wicket ignores its input, so <code>set</code>, <code>select</code>,
+        <code>choose</code>, <code>chooseAll</code>, <code>check</code> and <code>uncheck</code> fail with
+        <code>the component is not enabled in hierarchy</code>. So does <code>submit</code> through a disabled button,
+        which nobody could click.</li>
       <li><strong>A hidden field or button.</strong> It fails with <code>the component is not visible in
         hierarchy</code>.</li>
       <li><strong>A field with a <code>FormComponentUpdatingBehavior</code>.</strong> <code>FormTester.select</code>
-        sends a request for it at once, which throws away every value set so far. <code>select</code> fails and says
-        so; if you mean it, select through <code>formTester()</code>:</li>
+        sends a request for it at once, which throws away every value set so far. <code>select</code> and
+        <code>choose</code> fail and say so; if you mean it, select through <code>formTester()</code>:</li>
     </ul>
     <div class="code"><pre><code data-lang="java">kit.form(locate(Form.class).withId("order")).formTester().select("speed", 1);</code></pre></div>
 
@@ -445,12 +536,22 @@ Near misses (all criteria but one):
           <tr><td><code>withModelObject</code></td><td><code>has model object "ACME"</code>, or <code>has a model object that cannot be read</code></td></tr>
           <tr><td><code>matching</code></td><td><code>does not match "is required"</code></td></tr>
           <tr><td><code>withId</code></td><td><code>has id "status"</code></td></tr>
+          <tr><td><code>withLabel</code></td><td><code>has label "Customer"</code>, <code>has no label</code>, or <code>has a label that cannot be read</code></td></tr>
         </tbody>
       </table>
     </div>
-    <p>A locator that misses the type or any other cheap criterion is not asked for its model object or predicate, so
-      such components count as near misses only for locators without those. Building the message never throws: a
-      criterion that fails while near misses are collected simply counts as missed.</p>
+    <p>A locator that misses the type or any other cheap criterion is not asked for its model object, label or
+      predicate, so such components count as near misses only for locators without those. Building the message never
+      throws: a criterion that fails while near misses are collected simply counts as missed.</p>
+    <p>When no component is a near miss, for example after a refactoring that renamed an id and moved a row, the
+      message lists the components of the locator&#8217;s type instead, closest first, with everything that
+      differs:</p>
+    <div class="message"><pre>Expected exactly one match for a Label with id "customer" in the row of Order[id=99] in OrdersPage, but found none.
+Components of type Label:
+  - orders:0:customerName (is not in the row of Order[id=99]; has id "customerName")
+  - orders:1:customerName (is not in the row of Order[id=99]; has id "customerName")</pre></div>
+    <p>And when the page has no component of that type at all, the message ends with
+      <code>There is no Form in OrdersPage.</code></p>
 
     <h3 id="messages-several">Several match<a class="anchor" href="#messages-several" aria-label="Link to this section">#</a></h3>
     <div class="message"><pre>Expected exactly one match for an AjaxLink with id "ship" in OrdersPage, but found 3:
@@ -527,6 +628,10 @@ void shipsAnOrder() {
 
     ordersPage.rowOf(globex).assertStatus("shipped");
 }</code></pre></div>
+    <p>Name the locators in a page object, and failures speak its words as well:</p>
+    <div class="code"><pre><code data-lang="java">void ship() {
+    kit.click(locate(AjaxLink.class).withId("ship").inRowOf(order).named("the Ship button of " + order));
+}</code></pre></div>
     <p>Generic Wicket components such as <code>TextField</code> and <code>Form</code> make <code>locate</code> return
       a raw type: <code>locate(TextField.class)</code> is a <code>Locator&lt;TextField&gt;</code>. Passed straight to a
       method, that is fine. Kept in a field, it shows a raw-type warning; add
@@ -561,7 +666,14 @@ class OrdersPageTests {
       <dd>After <code>startComponentInPage</code>, the started component can&#8217;t be located, only what is inside
         it.</dd>
       <dt>Rows are list items</dt>
-      <dd><code>Loop</code> items and plain <code>RepeatingView</code> children are not rows.</dd>
+      <dd><code>Loop</code> items and plain <code>RepeatingView</code> children are not rows; use
+        <code>inside</code>.</dd>
+      <dt>Labels need Wicket to know them</dt>
+      <dd><code>withLabel</code> sees labels set by <code>setLabel</code> or a <code>&lt;wicket:label&gt;</code>, not a
+        plain <code>&lt;label wicket:for&gt;</code>.</dd>
+      <dt>Example tables name columns by id</dt>
+      <dd>So <code>assertRows</code> can&#8217;t compare a <code>DataTable</code>, whose cells all have the id
+        <code>cell</code>.</dd>
       <dt>Ajax fallback buttons</dt>
       <dd><code>AjaxFallbackButton</code> extends <code>Button</code>, so <code>submit(button)</code> submits through it
         without Ajax.</dd>
@@ -584,12 +696,15 @@ class OrdersPageTests {
         <tbody>
           <tr><td><code>static locate(Class&lt;T&gt; type)</code></td><td>Starts a locator for that type, subtypes included.</td></tr>
           <tr><td><code>withId(String id)</code></td><td>Narrows to a <code>wicket:id</code>.</td></tr>
+          <tr><td><code>withLabel(String text)</code></td><td>Narrows to components with that label.</td></tr>
           <tr><td><code>withModelObject(Object modelObject)</code></td><td>Narrows to an equal model object, or <code>null</code>.</td></tr>
+          <tr><td><code>withModelObject(Class&lt;M&gt;, Predicate&lt;? super M&gt;, String)</code></td><td>Narrows to a model object of that type that passes the predicate.</td></tr>
           <tr><td><code>visible()</code>, <code>enabled()</code></td><td>Narrow to components visible or enabled in hierarchy.</td></tr>
           <tr><td><code>inside(Locator&lt;?&gt; ancestor)</code></td><td>Narrows to components with a matching ancestor.</td></tr>
           <tr><td><code>inRowOf(Object element)</code></td><td>Narrows to the row of an equal element.</td></tr>
           <tr><td><code>inRowOf(Class&lt;E&gt;, Predicate&lt;? super E&gt;, String)</code></td><td>Narrows to the row of an element that passes the predicate.</td></tr>
           <tr><td><code>matching(Predicate&lt;? super T&gt;, String)</code></td><td>Narrows to components the predicate accepts.</td></tr>
+          <tr><td><code>named(String name)</code></td><td>Gives the locator a name for its description.</td></tr>
           <tr><td><code>one(MarkupContainer root)</code></td><td>The one match, or an <code>AssertionError</code>.</td></tr>
           <tr><td><code>all(MarkupContainer root)</code></td><td>Every match, in tree order.</td></tr>
           <tr><td><code>existsIn(MarkupContainer root)</code></td><td>Whether anything matches.</td></tr>
@@ -610,8 +725,10 @@ class OrdersPageTests {
           <tr><td><code>assertVisible</code>, <code>assertInvisible</code>, <code>assertEnabled</code>, <code>assertDisabled</code></td><td>Their WicketTester namesakes</td></tr>
           <tr><td><code>assertModelObject(Locator&lt;?&gt;, Object)</code></td><td><code>assertModelValue</code></td></tr>
           <tr><td><code>assertFeedback(Locator&lt;? extends FeedbackPanel&gt;, Serializable…)</code></td><td><code>assertFeedback</code></td></tr>
+          <tr><td><code>assertFeedbackOn(Locator&lt;?&gt;, Serializable…)</code></td><td><code>assertFeedbackMessages</code> for that component</td></tr>
           <tr><td><code>assertOnAjaxResponse(Locator&lt;?&gt;)</code></td><td><code>assertComponentOnAjaxResponse</code></td></tr>
           <tr><td><code>assertCount(Locator&lt;?&gt;, int)</code></td><td>How many match</td></tr>
+          <tr><td><code>assertRows(Locator&lt;? extends AbstractRepeater&gt;, String table)</code></td><td>A repeater&#8217;s rows against an example table</td></tr>
           <tr><td><code>one(Locator&lt;T&gt;)</code></td><td>The located component, typed</td></tr>
           <tr><td><code>pathOf(Locator&lt;?&gt;)</code></td><td>Its page-relative path</td></tr>
         </tbody>
@@ -623,6 +740,9 @@ class OrdersPageTests {
         <thead><tr><th>Method</th><th>Does</th></tr></thead>
         <tbody>
           <tr><td><code>set(Locator&lt;? extends FormComponent&gt;, String)</code></td><td><code>FormTester.setValue</code></td></tr>
+          <tr><td><code>choose(Locator&lt;? extends AbstractChoice&gt;, Object)</code></td><td><code>FormTester.select</code> with the choice&#8217;s index</td></tr>
+          <tr><td><code>chooseAll(Locator&lt;? extends ListMultipleChoice&gt;, Object…)</code></td><td><code>FormTester.selectMultiple</code>, replacing the selection</td></tr>
+          <tr><td><code>check</code>, <code>uncheck(Locator&lt;? extends CheckBox&gt;)</code></td><td><code>FormTester.setValue</code> with <code>true</code> or <code>false</code></td></tr>
           <tr><td><code>select(Locator&lt;? extends FormComponent&gt;, int)</code></td><td><code>FormTester.select</code></td></tr>
           <tr><td><code>ajax(Locator&lt;?&gt;, String event)</code></td><td><code>executeAjaxEvent</code> with the values set so far</td></tr>
           <tr><td><code>submit()</code></td><td><code>FormTester.submit()</code></td></tr>

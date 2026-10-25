@@ -220,7 +220,7 @@ section { padding-block: clamp(3rem, 7vw, 5.5rem); border-top: 1px solid var(--r
         <h1>Find components by <span class="target">what they are</span><span class="quiet">not where they sit.</span></h1>
         <p class="lede">WicketTester finds components by paths like <code>orders:1:customer</code>. Wrap a container
           around them or sort a list, and the test breaks, or checks the wrong row. <strong>wicket-testkit locates
-          components by type, <code>wicket:id</code>, model object and row,</strong> then acts and asserts through the
+          components by type, <code>wicket:id</code>, label, model object and row,</strong> then acts and asserts through the
           WicketTester you already have.</p>
         <div class="cta">
           <a class="btn primary" href="guide.html">Read the user guide</a>
@@ -299,9 +299,9 @@ kit.click(locate(AjaxLink.class).withId("ship").inRowOf(globex));</code></pre>
       <ol class="steps">
         <li>
           <h3>Locate by what it is</h3>
-          <p>A <code>Locator</code> starts with a type and narrows down: id, model object, visible, enabled, inside
-            another component, in the row of an element, or any predicate. It is immutable, so page objects can keep
-            it and refine it.</p>
+          <p>A <code>Locator</code> starts with a type and narrows down: id, label, model object, visible, enabled,
+            inside another component, in the row of an element, or any predicate. It is immutable, so page objects can
+            keep it, refine it and name it.</p>
           <div class="code"><pre><code data-lang="java">locate(Label.class)
     .withId("customer")
     .inRowOf(order)</code></pre></div>
@@ -336,7 +336,11 @@ kit.assertOnAjaxResponse(status);</code></pre></div>
         <ul class="points">
           <li><strong>Near misses.</strong> Nothing matched? You see the components that met every criterion but one,
             and what differs. A component of another type, or a hidden one, comes first.</li>
+          <li><strong>Nothing close?</strong> Then you see the components of the right type, closest first, with
+            everything that differs.</li>
           <li><strong>Several matches.</strong> Every path, so you know which refinement to add.</li>
+          <li><strong>In your words.</strong> Name a locator, <code>named("the Ship button of order 42")</code>, and its
+            failures start with that name.</li>
           <li><strong>Context for WicketTester&#8217;s failures.</strong> The locator and the component&#8217;s path go in
             front. Expected and actual are kept, so your IDE still shows its diff.</li>
         </ul>
@@ -375,6 +379,9 @@ Near misses (all criteria but one):
           <li><strong>Ajax included.</strong> Submitting through an <code>AjaxButton</code> uses Ajax, and the form
             helper&#8217;s <code>ajax</code> sends the values set so far, so an updating behavior sees the new
             input.</li>
+          <li><strong>By value, not position.</strong> <code>choose</code> selects the choice that equals yours, so
+            reordered choices don&#8217;t break the test; <code>chooseAll</code>, <code>check</code> and
+            <code>uncheck</code> cover multiple choices and check boxes.</li>
           <li><strong>No silent losses.</strong> A disabled or hidden field fails instead of dropping your value.</li>
           <li><strong>Step by step.</strong> Within one request, <code>kit.form(…)</code> returns the same helper, so a
             page object can fill a form across several methods.</li>
@@ -383,15 +390,16 @@ Near misses (all criteria but one):
       <div class="code">
         <div class="bar"><span class="name">CheckoutTest.java</span><button class="copy" type="button">Copy</button></div>
         <pre><code data-lang="java">kit.form(locate(Form.class).withId("order"))
-    .set(locate(TextField.class).withId("customer"), "Globex")
-    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .set(locate(TextField.class).withLabel("Customer"), "Globex")
+    .choose(locate(DropDownChoice.class).withId("country"), "Germany")
+    .check(locate(CheckBox.class).withId("giftWrap"))
     .submit(locate(AjaxButton.class).withId("save"));
 
 kit.assertFeedback(locate(FeedbackPanel.class).visible(), "Order saved.");
 
 // an AjaxFormComponentUpdatingBehavior, with the new value
 kit.form(locate(Form.class).withId("order"))
-    .select(locate(DropDownChoice.class).withId("country"), 2)
+    .choose(locate(DropDownChoice.class).withId("country"), "Switzerland")
     .ajax(locate(DropDownChoice.class).withId("country"), "change");</code></pre>
       </div>
     </div>
@@ -402,8 +410,8 @@ kit.form(locate(Form.class).withId("order"))
       <div class="section-head">
         <p class="eyebrow">Page objects</p>
         <h2 id="po-title">Tests in the words of your domain.</h2>
-        <p>Locators are values. Keep them in a page object, refine them per row, and your tests read like the
-          requirement they prove.</p>
+        <p>Locators are values. Keep them in a page object, refine them per row, name them, and your tests read
+          like the requirement they prove.</p>
         <div class="code">
           <div class="bar"><span class="name">ShippingTest.java</span></div>
           <pre><code data-lang="java">ordersPage.rowOf(globex).ship();
@@ -445,6 +453,45 @@ ordersPage.rowOf(globex).assertStatus("shipped");</code></pre>
     </div>
   </section>
 
+  <section id="tables" aria-labelledby="tables-title">
+    <div class="wrap split">
+      <div class="section-head">
+        <p class="eyebrow">Example tables</p>
+        <h2 id="tables-title">Write the examples. Run them.</h2>
+        <p>A specification gives examples as tables. <code>assertRows</code> compares a repeater&#8217;s rows with one,
+          so the test reads like the example it proves.</p>
+        <ul class="points">
+          <li><strong>As a user reads it.</strong> Cells hold the text Wicket renders, unescaped, so
+            <code>O'Brien &amp; Sons</code> stays as it reads. Hidden rows are left out.</li>
+          <li><strong>A diff, not a riddle.</strong> When rows differ, both tables come padded alike as expected and
+            actual values, so your IDE shows them side by side.</li>
+        </ul>
+      </div>
+      <div class="messages">
+        <div class="code">
+          <div class="bar"><span class="name">OrdersPageTest.java</span><button class="copy" type="button">Copy</button></div>
+          <pre><code data-lang="java">kit.assertRows(locate(ListView.class).withId("orders"), """
+    | customer | status  |
+    | ACME     | open    |
+    | Globex   | shipped |
+    """);</code></pre>
+        </div>
+        <figure>
+          <div class="message"><pre>a ListView with id "orders" (at orders): the rows differ
+expected:
+| customer | status  |
+| ACME     | open    |
+| Globex   | <span class="em">shipped</span> |
+but was:
+| customer | status  |
+| ACME     | open    |
+| Globex   | <span class="em">open   </span> |</pre></div>
+          <figcaption>Globex wasn&#8217;t shipped: the one row that differs stands out.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
   <section id="install" aria-labelledby="install-title">
     <div class="wrap split install">
       <div class="section-head">
@@ -452,7 +499,7 @@ ordersPage.rowOf(globex).assertStatus("shipped");</code></pre>
         <h2 id="install-title">One test dependency.</h2>
         <p>wicket-testkit uses the <code>wicket-core</code> and <code>wicket-tester</code> your project already has,
           so your Wicket version wins. Wicket 10, Java 17 or newer.</p>
-        <p class="status-note">Latest release: 0.1.0, on
+        <p class="status-note">Latest release: 0.2.0, on
           <a href="https://central.sonatype.com/artifact/dev.jbaby/wicket-testkit">Maven Central</a>.</p>
       </div>
       <div>
@@ -467,7 +514,7 @@ ordersPage.rowOf(globex).assertStatus("shipped");</code></pre>
               <pre><code data-lang="xml">&lt;dependency&gt;
     &lt;groupId&gt;dev.jbaby&lt;/groupId&gt;
     &lt;artifactId&gt;wicket-testkit&lt;/artifactId&gt;
-    &lt;version&gt;0.1.0&lt;/version&gt;
+    &lt;version&gt;0.2.0&lt;/version&gt;
     &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre>
             </div>
@@ -475,7 +522,7 @@ ordersPage.rowOf(globex).assertStatus("shipped");</code></pre>
           <div id="panel-gradle" role="tabpanel" aria-labelledby="tab-gradle" hidden>
             <div class="code">
               <div class="bar"><span class="name">build.gradle.kts</span><button class="copy" type="button">Copy</button></div>
-              <pre><code data-lang="kotlin">testImplementation("dev.jbaby:wicket-testkit:0.1.0")</code></pre>
+              <pre><code data-lang="kotlin">testImplementation("dev.jbaby:wicket-testkit:0.2.0")</code></pre>
             </div>
           </div>
         </div>

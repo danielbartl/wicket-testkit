@@ -32,12 +32,12 @@ Add it in test scope. It needs Wicket 10 and Java 17 or newer, and uses the `wic
 <dependency>
     <groupId>dev.jbaby</groupId>
     <artifactId>wicket-testkit</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <scope>test</scope>
 </dependency>
 ```
 
-Gradle: `testImplementation("dev.jbaby:wicket-testkit:0.1.0")`
+Gradle: `testImplementation("dev.jbaby:wicket-testkit:0.2.0")`
 
 ## Locating components
 
@@ -57,6 +57,15 @@ locate(Label.class)                                    // every Label, subclasse
     .matching(label -> label.getDefaultModelObjectAsString().startsWith("A"), "starts with A");  // anything else
 ```
 
+Form fields can be found by their label, and model objects without a useful `equals`, such as
+entities, by a check:
+
+```java
+locate(TextField.class).withLabel("Customer")                                   // setLabel or <wicket:label>
+locate(OrderPanel.class).withModelObject(Order.class, o -> o.id() == 42, "has id 42")
+locate(Label.class).withId("total").inRowOf(Order.class, o -> o.id() == 42, "has id 42")
+```
+
 Locators are immutable. Every step returns a new locator, so you can keep a base locator and
 refine it. A locator finds components among the descendants of a page or any other container:
 
@@ -68,6 +77,18 @@ boolean any = locate(Link.class).withId("next").existsIn(page);
 
 A locator doesn't filter by visibility unless you call `visible()`. That way the same locator
 works for asserting that something is invisible.
+
+Give a locator a name in your domain's words, and its failure messages start with that name:
+
+```java
+locate(AjaxLink.class).withId("ship").inRowOf(order).named("the Ship button of order 42")
+```
+
+```
+Expected exactly one match for the Ship button of order 42, an AjaxLink with id "ship" in the row of Order[id=42, customer=Globex] in OrdersPage, but found none.
+```
+
+Refining a named locator returns one without the name, because the name no longer fits it.
 
 The locating layer (`dev.jbaby.wicket.testkit.locator`) uses nothing from wicket-tester, so it
 works on any component tree.
@@ -94,6 +115,7 @@ kit.assertEnabled(locate(Button.class).withId("save"));                         
 kit.assertDisabled(locate(Link.class).withId("archive"));                         // assertDisabled
 kit.assertModelObject(locate(TextField.class).withId("customer"), "ACME");        // assertModelValue
 kit.assertFeedback(locate(FeedbackPanel.class).visible(), "Shipped order 42");    // assertFeedback
+kit.assertFeedbackOn(locate(TextField.class).withId("customer"), "'Customer' is required.");  // assertFeedbackMessages
 kit.assertCount(locate(Link.class).withId("ship").visible(), 0);
 ```
 
@@ -113,9 +135,16 @@ form only.
 ```java
 kit.form(locate(Form.class).withId("order"))
     .set(locate(TextField.class).withId("customer"), "Globex")
-    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .choose(locate(DropDownChoice.class).withId("country"), "Germany")
+    .chooseAll(locate(CheckBoxMultipleChoice.class).withId("extras"), "insurance", "tracking")
+    .check(locate(CheckBox.class).withId("giftWrap"))
     .submit(locate(AjaxButton.class).withId("save"));
 ```
+
+`choose` selects the choice that equals the one you give, so the test keeps working when the
+choices are reordered; if the field has no such choice, the failure lists the ones it has.
+`select(field, index)` selects by position. `chooseAll` replaces a multiple choice's selection,
+and `check` and `uncheck` set check boxes.
 
 `submit()` submits without a button. `submit(button)` submits through the button, using Ajax if it
 is an `AjaxButton` or `AjaxSubmitLink`, as `FormTester` does.
@@ -126,14 +155,44 @@ the form helper's `ajax`. It sends the values set so far, so the behavior sees t
 
 ```java
 kit.form(locate(Form.class).withId("order"))
-    .select(locate(DropDownChoice.class).withId("country"), 1)
+    .choose(locate(DropDownChoice.class).withId("country"), "Germany")
     .ajax(locate(DropDownChoice.class).withId("country"), "change");
 ```
 
 A form helper lives for one request. Until the tester handles another one, `kit.form(...)` returns
 the same helper, so a page object can fill in a form step by step. After a submit, an Ajax event
 or any other request, call `kit.form(...)` again. For anything the helper doesn't offer, such as
-files or multiple selections, `formTester()` returns the `FormTester` behind it.
+files, `formTester()` returns the `FormTester` behind it.
+
+### Example tables
+
+`assertRows` compares the rows of a repeater with a table, the way a specification gives
+examples. The header names the `wicket:id`s to read in every row:
+
+```java
+kit.assertRows(locate(ListView.class).withId("orders"), """
+    | customer | status  |
+    | ACME     | open    |
+    | Globex   | shipped |
+    """);
+```
+
+A cell holds the component's model object as Wicket renders it, without escaping, so
+`O'Brien & Sons` is written as it reads. Hidden rows are left out, hidden components count as
+empty, and whitespace counts as a browser shows it. When the rows differ, the failure carries
+both tables, padded alike, as expected and actual values, so your IDE shows them side by side:
+
+```
+a ListView with id "orders" (at orders): the rows differ
+expected:
+| customer | status  |
+| ACME     | open    |
+| Globex   | shipped |
+but was:
+| customer | status  |
+| ACME     | open    |
+| Globex   | open    |
+```
 
 ### Failure messages
 
@@ -147,6 +206,16 @@ Expected exactly one match for a Label with id "customr" in the row of Order[id=
 Near misses (all criteria but one):
   - orders:1:customer (has id "customer")
   - orders:1:status (has id "status")
+```
+
+When no component comes that close, the message lists the components of the locator's type,
+closest first, with everything that differs:
+
+```
+Expected exactly one match for a Label with id "customer" in the row of Order[id=99] in OrdersPage, but found none.
+Components of type Label:
+  - orders:0:customerName (is not in the row of Order[id=99]; has id "customerName")
+  - orders:1:customerName (is not in the row of Order[id=99]; has id "customerName")
 ```
 
 A locator that matches several components lists them:
@@ -216,6 +285,8 @@ void shipsAnOrder() {
 This exact page object runs as a test in
 [`src/test/java/dev/jbaby/wicket/testkit/examples`](src/test/java/dev/jbaby/wicket/testkit/examples).
 
+Name the locators in a page object with `named`, and failures speak the domain's words as well.
+
 ## Limits
 
 - **Test scope only.** Production code that has to walk the component tree should use Wicket's
@@ -231,9 +302,13 @@ This exact page object runs as a test in
   `PageableListView`), `RefreshingView` and `DataView`, whose `Item` extends `ListItem`.
   `Loop` items and plain `RepeatingView` children are not rows; use `inside` or `matching`
   for them.
-- **Fields that submit on change.** `select` fails on a field with a
+- **Fields that submit on change.** `select` and `choose` fail on a field with a
   `FormComponentUpdatingBehavior`, because `FormTester` would send a request for it at once and
   lose the values set so far. Select it through `formTester()` if you mean it.
+- **Labels.** `withLabel` sees a label set by `setLabel` or by a `<wicket:label>` in the markup.
+  A plain `<label wicket:for>` sets none.
+- **Example tables name columns by `wicket:id`.** So `assertRows` can't compare a `DataTable`,
+  whose cells all have the id `cell`.
 - **Ajax fallback buttons.** `AjaxFallbackButton` extends `Button`, so `FormTester`, and with it
   `submit(button)`, submits through it without Ajax.
 - **`WicketTester`, not `BaseWicketTester`.** The assertions exist only on `WicketTester`.
