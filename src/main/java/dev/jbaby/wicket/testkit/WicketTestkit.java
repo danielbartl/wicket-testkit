@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import org.apache.wicket.Component;
 import org.apache.wicket.Page;
+import org.apache.wicket.feedback.ComponentFeedbackMessageFilter;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
@@ -207,6 +208,24 @@ public final class WicketTestkit {
         notNull(expectedMessages, "expectedMessages");
         var located = locateVisible(notNull(panel, "panel"));
         check(panel, located, () -> tester.assertFeedback(located.getPageRelativePath(), expectedMessages));
+    }
+
+    /// Asserts the feedback messages of one component, such as a form field, as
+    /// `WicketTester.assertFeedbackMessages` does with a `ComponentFeedbackMessageFilter` for it.
+    ///
+    /// ```java
+    /// kit.assertFeedbackOn(locate(TextField.class).withId("customer"), "'Customer' is required.");
+    /// kit.assertFeedbackOn(locate(TextField.class).withId("country"));
+    /// ```
+    ///
+    /// @param component the locator of the component
+    /// @param expectedMessages every message the component should have, in any order; none
+    ///     asserts that it has no messages
+    public void assertFeedbackOn(Locator<?> component, Serializable... expectedMessages) {
+        notNull(expectedMessages, "expectedMessages");
+        var located = locate(notNull(component, "component"));
+        check(component, located,
+            () -> tester.assertFeedbackMessages(new ComponentFeedbackMessageFilter(located), expectedMessages));
     }
 
     /// Asserts that the last Ajax response rendered a component, as

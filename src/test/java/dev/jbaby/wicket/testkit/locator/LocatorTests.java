@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import dev.jbaby.wicket.testkit.fixtures.Headline;
 import dev.jbaby.wicket.testkit.fixtures.NoOpLink;
 import dev.jbaby.wicket.testkit.fixtures.Order;
+import dev.jbaby.wicket.testkit.fixtures.OrderFormPage;
 import dev.jbaby.wicket.testkit.fixtures.ShopPage;
 import dev.jbaby.wicket.testkit.fixtures.UserPanel;
 import java.io.Serializable;
@@ -21,8 +22,12 @@ import org.apache.wicket.Page;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.markup.html.form.DropDownChoice;
+import org.apache.wicket.markup.html.form.TextField;
+import org.apache.wicket.markup.repeater.RepeatingView;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.model.Model;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -142,6 +147,58 @@ class LocatorTests {
 
             assertThat(paths(locate(Component.class).withModelObject("ACME").all(root))).containsExactly("name");
         }
+
+        @Test
+        @DisplayName("R2.9 withLabel matches only components whose label equals the text")
+        void withLabelMatchesTheLabel() {
+            tester.startPage(OrderFormPage.class);
+            var formPage = tester.getLastRenderedPage();
+
+            assertThat(paths(locate(TextField.class).withLabel("Customer").all(formPage)))
+                .containsExactly("order:customer");
+            assertThat(locate(DropDownChoice.class).withLabel("Country").all(formPage))
+                .as("a plain <label wicket:for> sets no label")
+                .isEmpty();
+            assertThat(locate(Label.class).withLabel("Shop").all(page))
+                .as("a Label has no label")
+                .isEmpty();
+        }
+
+        @Test
+        @DisplayName("R2.10 labels are compared without whitespace at either end and with every run of whitespace as one space")
+        void labelsAreComparedWithWhitespaceNormalized() {
+            tester.startPage(OrderFormPage.class);
+            var formPage = tester.getLastRenderedPage();
+
+            assertThat(paths(locate(TextField.class).withLabel("Search term").all(formPage)))
+                .as("<wicket:label> spread over lines")
+                .containsExactly("search:query");
+            assertThat(paths(locate(TextField.class).withLabel(" Search\t term\n").all(formPage)))
+                .containsExactly("search:query");
+            assertThat(locate(TextField.class).withLabel("Searchterm").all(formPage)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("R2.11 a component whose label cannot be read does not match withLabel")
+        void unreadableLabelsDoNotMatch() {
+            var root = new WebMarkupContainer("root");
+            root.add(new TextField<String>("broken").setLabel(CombineRefinements.failingModel()));
+            root.add(new TextField<String>("customer").setLabel(Model.of("Customer")));
+
+            assertThat(paths(locate(TextField.class).withLabel("Customer").all(root))).containsExactly("customer");
+        }
+
+        @Test
+        @DisplayName("R2.12 withModelObject with a type and a predicate matches only components whose model object passes")
+        void withModelObjectAndAPredicateMatchesModelObjectsThatPass() {
+            assertThat(paths(locate(Component.class)
+                .withModelObject(Order.class, order -> order.id() == 42, "has id 42").all(page)))
+                .as("the rows themselves")
+                .containsExactly("orders:1", "table:2");
+            assertThat(paths(locate(Label.class)
+                .withModelObject(Integer.class, number -> number > 41, "is above 41").all(page)))
+                .containsExactly("orders:1:number", "orders:2:number");
+        }
     }
 
     @Nested
@@ -222,6 +279,40 @@ class LocatorTests {
             assertThat(locate(Label.class).inRowOf(String.class, element -> true, "is anything").all(page))
                 .isEmpty();
         }
+
+        @Test
+        @DisplayName("R3.5 inRowOf matches only components inside a row of any other repeater whose model object equals the argument")
+        void inRowOfMatchesRowsOfOtherRepeaters() {
+            var root = new WebMarkupContainer("root");
+            var view = new RepeatingView("view");
+            for (var order : Order.ALL) {
+                var row = new WebMarkupContainer(view.newChildId(), Model.of(order));
+                view.add(row.add(new Label("customer", order.customer())));
+            }
+            root.add(view);
+
+            assertThat(paths(locate(Label.class).inRowOf(Order.GLOBEX_42).all(root)))
+                .containsExactly("view:2:customer");
+            assertThat(paths(locate(Label.class)
+                .inRowOf(Order.class, order -> order.customer().equals("ACME"), "is for ACME").all(root)))
+                .containsExactly("view:1:customer", "view:3:customer");
+        }
+
+        @Test
+        @DisplayName("R3.6 a row whose model object cannot be read does not match inRowOf")
+        void unreadableRowsDoNotMatch() {
+            var root = new WebMarkupContainer("root");
+            var view = new RepeatingView("view");
+            view.add(new WebMarkupContainer(view.newChildId(), CombineRefinements.failingModel())
+                .add(new Label("customer", "ACME")));
+            view.add(new WebMarkupContainer(view.newChildId(), Model.of(Order.ACME_41))
+                .add(new Label("customer", "ACME")));
+            root.add(view);
+
+            assertThat(paths(locate(Label.class).inRowOf(Order.ACME_41).all(root))).containsExactly("view:2:customer");
+            assertThat(paths(locate(Label.class).inRowOf(Order.class, order -> true, "is any order").all(root)))
+                .containsExactly("view:2:customer");
+        }
     }
 
     @Nested
@@ -255,6 +346,17 @@ class LocatorTests {
             assertAll(
                 () -> assertThatNullPointerException().isThrownBy(() -> locate(null)).withMessageContaining("type"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.withId(null)).withMessageContaining("id"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.withLabel(null))
+                    .withMessageContaining("text"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> labels.withModelObject(null, object -> true, "is anything"))
+                    .withMessageContaining("modelObjectType"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> labels.withModelObject(Order.class, null, "is anything"))
+                    .withMessageContaining("predicate"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> labels.withModelObject(Order.class, order -> true, null))
+                    .withMessageContaining("description"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.inside(null))
                     .withMessageContaining("ancestor"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.inRowOf(null))
@@ -292,6 +394,9 @@ class LocatorTests {
                 .containsExactly("customer");
             assertThat(paths(locate(Label.class).withModelObject("ACME").withId("customer").all(root)))
                 .containsExactly("customer");
+            assertThat(paths(locate(Label.class).withModelObject(String.class, "ACME"::equals, "is ACME")
+                .withId("customer").all(root)))
+                .containsExactly("customer");
             locate(Label.class).withId("customer").matching(seen::add, "is recorded").all(root);
             locate(Label.class).matching(seenWhenGivenFirst::add, "is recorded").withId("customer").all(root);
             assertThat(paths(seen)).containsExactly("customer");
@@ -305,13 +410,15 @@ class LocatorTests {
         }
 
         @Test
-        @DisplayName("R4.5 matching with a blank description throws an IllegalArgumentException")
+        @DisplayName("R4.5 matching, inRowOf or withModelObject with a blank description throws an IllegalArgumentException")
         void blankDescriptionsAreRejected() {
             var labels = locate(Label.class);
 
             assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, ""));
             assertThatIllegalArgumentException().isThrownBy(() -> labels.matching(label -> true, "  "));
             assertThatIllegalArgumentException().isThrownBy(() -> labels.inRowOf(Order.class, order -> true, " "));
+            assertThatIllegalArgumentException()
+                .isThrownBy(() -> labels.withModelObject(Order.class, order -> true, " "));
         }
     }
 
@@ -395,6 +502,12 @@ class LocatorTests {
                 .hasToString("a Label that is bold and is short");
             assertThat(locate(Label.class).inRowOf(Order.class, order -> order.id() == 42, "has id 42"))
                 .hasToString("a Label in the row of an Order that has id 42");
+            assertThat(locate(TextField.class)
+                .withModelObject(Order.class, order -> order.id() == 42, "has id 42")
+                .withLabel("Customer")
+                .withId("customer"))
+                .hasToString("a TextField with id \"customer\" with label \"Customer\""
+                    + " whose model object is an Order that has id 42");
         }
 
         @Test

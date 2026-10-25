@@ -1,16 +1,22 @@
 package dev.jbaby.wicket.testkit;
 
-import static dev.jbaby.wicket.testkit.WicketTestkit.check;
 import static dev.jbaby.wicket.testkit.WicketTestkit.notNull;
 import static dev.jbaby.wicket.testkit.WicketTestkit.prefix;
 import static dev.jbaby.wicket.testkit.WicketTestkit.requireAjaxBehavior;
 import static dev.jbaby.wicket.testkit.WicketTestkit.requireVisible;
 
+import static java.util.stream.Collectors.joining;
+
 import dev.jbaby.wicket.testkit.locator.Locator;
+import java.util.List;
+import java.util.stream.Stream;
 import org.apache.wicket.Component;
+import org.apache.wicket.markup.html.form.AbstractChoice;
+import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.FormComponent;
 import org.apache.wicket.markup.html.form.FormComponentUpdatingBehavior;
+import org.apache.wicket.markup.html.form.ListMultipleChoice;
 import org.apache.wicket.util.tester.FormTester;
 import org.apache.wicket.util.tester.WicketTester;
 
@@ -20,7 +26,8 @@ import org.apache.wicket.util.tester.WicketTester;
 /// ```java
 /// kit.form(locate(Form.class).withId("order"))
 ///     .set(locate(TextField.class).withId("customer"), "ACME")
-///     .select(locate(DropDownChoice.class).withId("country"), 2)
+///     .choose(locate(DropDownChoice.class).withId("country"), "Switzerland")
+///     .check(locate(CheckBox.class).withId("giftWrap"))
 ///     .submit(locate(AjaxButton.class).withId("save"));
 /// ```
 ///
@@ -28,6 +35,9 @@ import org.apache.wicket.util.tester.WicketTester;
 /// same helper for the same form, so page objects can fill in a form step by step. Once a submit,
 /// an Ajax event or anything else has sent a request, the helper fails; call `form` again.
 public final class FormHelper {
+
+    /// How many choices a failure message lists.
+    private static final int MAX_CHOICES = 10;
 
     private final WicketTester tester;
     @SuppressWarnings("rawtypes")
@@ -60,7 +70,7 @@ public final class FormHelper {
         requireCurrent();
         notNull(value, "value");
         var located = locateUsable(notNull(field, "field"));
-        check(field, located, () -> formTester.setValue(located, value));
+        WicketTestkit.check(field, located, () -> formTester.setValue(located, value));
         return this;
     }
 
@@ -83,14 +93,92 @@ public final class FormHelper {
             int index) {
         requireCurrent();
         var located = locateUsable(notNull(field, "field"));
-        if (!located.getBehaviors(FormComponentUpdatingBehavior.class).isEmpty()) {
-            throw new AssertionError(prefix(field, located) + "the component has a "
-                + "FormComponentUpdatingBehavior, which FormTester would run at once, losing the values set so far;"
-                + " use formTester() to select it anyway");
-        }
-        var formRelativePath = located.getPageRelativePath()
-            .substring(form.getPageRelativePath().length() + 1);
-        check(field, located, () -> formTester.select(formRelativePath, index));
+        requireNoUpdatingBehavior(field, located);
+        WicketTestkit.check(field, located, () -> formTester.select(formRelativePath(located), index));
+        return this;
+    }
+
+    /// Selects a choice, as `FormTester.select` does with the index of the first of the field's
+    /// choices that equals it. Unlike [#select(Locator, int)], it still selects the right choice
+    /// once the choices are reordered.
+    ///
+    /// ```java
+    /// form.choose(locate(DropDownChoice.class).withId("country"), "Switzerland");
+    /// ```
+    ///
+    /// Like `select`, it fails on a field with a `FormComponentUpdatingBehavior`.
+    ///
+    /// @param field the locator of the choice field, inside this form
+    /// @param choice the choice, compared with `equals`
+    /// @return this helper
+    /// @throws AssertionError also if the field has no such choice; the message lists the choices
+    ///     it has
+    public FormHelper choose(@SuppressWarnings("rawtypes") Locator<? extends AbstractChoice> field,
+            Object choice) {
+        requireCurrent();
+        notNull(choice, "choice");
+        var located = (AbstractChoice<?, ?>) locateUsable(notNull(field, "field"));
+        requireNoUpdatingBehavior(field, located);
+        var index = indexOf(field, located, choice);
+        WicketTestkit.check(field, located, () -> formTester.select(formRelativePath(located), index));
+        return this;
+    }
+
+    /// Replaces the selection of a multiple-choice field with exactly the given choices, as
+    /// `FormTester.selectMultiple` does with their indexes. Without choices, it clears the
+    /// selection.
+    ///
+    /// ```java
+    /// form.chooseAll(locate(CheckBoxMultipleChoice.class).withId("extras"), "insurance", "tracking");
+    /// ```
+    ///
+    /// @param field the locator of the multiple-choice field, such as a `CheckBoxMultipleChoice`,
+    ///     inside this form
+    /// @param choices the choices to select, compared with `equals`
+    /// @return this helper
+    /// @throws AssertionError also if the field lacks one of the choices; the message lists the
+    ///     choices it has
+    public FormHelper chooseAll(@SuppressWarnings("rawtypes") Locator<? extends ListMultipleChoice> field,
+            Object... choices) {
+        requireCurrent();
+        Stream.of(notNull(choices, "choices")).forEach(choice -> notNull(choice, "choices"));
+        var located = (ListMultipleChoice<?>) locateUsable(notNull(field, "field"));
+        var indexes = Stream.of(choices).mapToInt(choice -> indexOf(field, located, choice)).toArray();
+        WicketTestkit.check(field, located,
+            () -> formTester.selectMultiple(formRelativePath(located), indexes, true));
+        return this;
+    }
+
+    /// Checks a check box, as `FormTester.setValue` does with `true`.
+    ///
+    /// ```java
+    /// form.check(locate(CheckBox.class).withId("giftWrap"));
+    /// ```
+    ///
+    /// @param field the locator of the check box, inside this form
+    /// @return this helper
+    /// @throws AssertionError also if the check box is not enabled in hierarchy
+    public FormHelper check(Locator<? extends CheckBox> field) {
+        return setChecked(field, true);
+    }
+
+    /// Unchecks a check box, as `FormTester.setValue` does with `false`.
+    ///
+    /// ```java
+    /// form.uncheck(locate(CheckBox.class).withId("giftWrap"));
+    /// ```
+    ///
+    /// @param field the locator of the check box, inside this form
+    /// @return this helper
+    /// @throws AssertionError also if the check box is not enabled in hierarchy
+    public FormHelper uncheck(Locator<? extends CheckBox> field) {
+        return setChecked(field, false);
+    }
+
+    private FormHelper setChecked(Locator<? extends CheckBox> field, boolean checked) {
+        requireCurrent();
+        var located = locateUsable(notNull(field, "field"));
+        WicketTestkit.check(field, located, () -> formTester.setValue(formRelativePath(located), checked));
         return this;
     }
 
@@ -112,7 +200,7 @@ public final class FormHelper {
         notNull(event, "event");
         var located = requireVisible(component, notNull(component, "component").one(form));
         requireAjaxBehavior(component, located, event);
-        check(component, located, () -> tester.executeAjaxEvent(located, event));
+        WicketTestkit.check(component, located, () -> tester.executeAjaxEvent(located, event));
     }
 
     /// Submits the form with the values set so far, as `FormTester.submit()` does.
@@ -122,7 +210,7 @@ public final class FormHelper {
     /// ```
     public void submit() {
         requireCurrent();
-        check(formLocator, form, formTester::submit);
+        WicketTestkit.check(formLocator, form, formTester::submit);
     }
 
     /// Submits the form through a button with the values set so far, as
@@ -139,11 +227,11 @@ public final class FormHelper {
     public void submit(Locator<?> button) {
         requireCurrent();
         var located = locateUsable(notNull(button, "button"));
-        check(button, located, () -> formTester.submit(located));
+        WicketTestkit.check(button, located, () -> formTester.submit(located));
     }
 
     /// Returns the `FormTester` behind this helper, with the values set so far, for what the
-    /// helper doesn't offer: files, multiple selections, check boxes as booleans.
+    /// helper doesn't offer, such as files.
     ///
     /// ```java
     /// kit.form(locate(Form.class).withId("upload")).formTester().setFile("file", file, "text/plain");
@@ -165,6 +253,48 @@ public final class FormHelper {
             throw new AssertionError(prefix(formLocator, form)
                 + "the tester has handled a request since this form helper was created; call form again");
         }
+    }
+
+    /// Fails if the field has a `FormComponentUpdatingBehavior`, which `FormTester.select` would
+    /// run at once.
+    private static void requireNoUpdatingBehavior(Locator<?> field, Component located) {
+        if (!located.getBehaviors(FormComponentUpdatingBehavior.class).isEmpty()) {
+            throw new AssertionError(prefix(field, located) + "the component has a "
+                + "FormComponentUpdatingBehavior, which FormTester would run at once, losing the values set so far;"
+                + " use formTester() to select it anyway");
+        }
+    }
+
+    /// The index of the first of the field's choices that equals the choice.
+    private static int indexOf(Locator<?> field, AbstractChoice<?, ?> located, Object choice) {
+        var choices = located.getChoices();
+        for (var index = 0; index < choices.size(); index++) {
+            if (choice.equals(choices.get(index))) {
+                return index;
+            }
+        }
+        throw new AssertionError(prefix(field, located) + "the component has no choice " + value(choice)
+            + "; its choices are " + listed(choices));
+    }
+
+    /// The choices separated by commas, at most `MAX_CHOICES` of them, or `none`.
+    private static String listed(List<?> choices) {
+        if (choices.isEmpty()) {
+            return "none";
+        }
+        var shown = choices.stream().limit(MAX_CHOICES).map(FormHelper::value).collect(joining(", "));
+        return choices.size() > MAX_CHOICES ? shown + ", and " + (choices.size() - MAX_CHOICES) + " more" : shown;
+    }
+
+    /// A string in double quotes, any other value as `String.valueOf` shows it, as a locator's
+    /// description shows values.
+    private static String value(Object value) {
+        return value instanceof String ? "\"" + value + "\"" : String.valueOf(value);
+    }
+
+    /// The component's path relative to the form, as `FormTester` takes it.
+    private String formRelativePath(Component component) {
+        return component.getPageRelativePath().substring(form.getPageRelativePath().length() + 1);
     }
 
     /// The one component the locator matches inside the form, which has to be visible and enabled

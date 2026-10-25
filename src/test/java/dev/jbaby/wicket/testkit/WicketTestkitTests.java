@@ -126,6 +126,11 @@ class WicketTestkitTests {
                 () -> assertThatNullPointerException()
                     .isThrownBy(() -> kit.assertFeedback(feedback, (java.io.Serializable[]) null))
                     .withMessageContaining("expectedMessages"),
+                () -> assertThatNullPointerException().isThrownBy(() -> kit.assertFeedbackOn(null))
+                    .withMessageContaining("component"),
+                () -> assertThatNullPointerException()
+                    .isThrownBy(() -> kit.assertFeedbackOn(label, (java.io.Serializable[]) null))
+                    .withMessageContaining("expectedMessages"),
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.assertOnAjaxResponse(null))
                     .withMessageContaining("component"),
                 () -> assertThatNullPointerException().isThrownBy(() -> kit.assertCount(null, 1))

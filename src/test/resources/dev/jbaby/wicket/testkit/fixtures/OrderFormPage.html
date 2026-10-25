@@ -3,14 +3,20 @@
 <body>
 <form wicket:id="order">
     <input type="text" wicket:id="customer">
-    <div wicket:id="details"><select wicket:id="country"></select></div>
+    <div wicket:id="details"><label wicket:for="country">Country</label><select wicket:id="country"></select></div>
     <select wicket:id="speed"></select>
+    <input type="checkbox" wicket:id="giftWrap">
+    <span wicket:id="extras"></span>
+    <select wicket:id="quantity"></select>
+    <select wicket:id="slot"></select>
     <div wicket:id="archived">
         <input type="text" wicket:id="note"> <select wicket:id="region"></select>
+        <input type="checkbox" wicket:id="insured"> <select multiple wicket:id="services"></select>
         <input type="submit" wicket:id="restore" value="Restore">
     </div>
     <div wicket:id="extra">
         <input type="text" wicket:id="coupon"> <select wicket:id="gift"></select>
+        <input type="checkbox" wicket:id="fragile"> <select multiple wicket:id="addons"></select>
         <input type="submit" wicket:id="apply" value="Apply">
     </div>
     <input type="submit" wicket:id="save" value="Save">
@@ -19,7 +25,13 @@
 </form>
 <p wicket:id="result"></p>
 <p wicket:id="shipping"></p>
-<form wicket:id="search"><input type="text" wicket:id="query"></form>
+<form wicket:id="search">
+    <label wicket:for="query"><wicket:label>
+        Search
+        term
+    </wicket:label></label>
+    <input type="text" wicket:id="query">
+</form>
 <form wicket:id="hidden"></form>
 </body>
 </html>

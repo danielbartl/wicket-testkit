@@ -10,6 +10,7 @@ final class FailureMessage {
 
     static final int MAX_MATCHES = 10;
     static final int MAX_NEAR_MISSES = 5;
+    static final int MAX_CANDIDATES = 5;
 
     private FailureMessage() {
     }
@@ -18,8 +19,13 @@ final class FailureMessage {
     record NearMiss(Component component, String whatDiffers, int order) {
     }
 
+    /// A component of a locator's type that misses several criteria, and what differs for each.
+    record Candidate(Component component, List<String> whatDiffers) {
+    }
+
+    /// The candidates are shown only if nothing matches and there is no near miss.
     static String notExactlyOne(Locator<?> locator, MarkupContainer root,
-            List<? extends Component> matches, List<NearMiss> nearMisses) {
+            List<? extends Component> matches, List<NearMiss> nearMisses, List<Candidate> candidates) {
         var message = new StringBuilder("Expected exactly one match for ")
             .append(locator).append(" in ").append(describe(root)).append(", but found ");
         if (!matches.isEmpty()) {
@@ -32,6 +38,15 @@ final class FailureMessage {
                 appendList(message, nearMisses.stream()
                     .map(nearMiss -> path(nearMiss.component(), root) + " (" + nearMiss.whatDiffers() + ")")
                     .toList(), MAX_NEAR_MISSES);
+            } else if (!candidates.isEmpty()) {
+                message.append("\nComponents of type ").append(Words.className(locator.type())).append(':');
+                appendList(message, candidates.stream()
+                    .map(candidate -> path(candidate.component(), root)
+                        + " (" + String.join("; ", candidate.whatDiffers()) + ")")
+                    .toList(), MAX_CANDIDATES);
+            } else if (locator.isRefined()) {
+                message.append("\nThere is no ").append(Words.className(locator.type()))
+                    .append(" in ").append(describe(root)).append('.');
             }
         }
         return message.toString();

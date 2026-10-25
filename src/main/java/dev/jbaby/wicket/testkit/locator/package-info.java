@@ -11,8 +11,8 @@
 ///
 /// ## Operations
 /// - `locate`: start a locator for the components of a type (`Locator.locate`)
-/// - `refine`: narrow a locator down (`Locator.withId`, `withModelObject`, `visible`,
-///   `enabled`, `inside`, `inRowOf`, `matching`)
+/// - `refine`: narrow a locator down (`Locator.withId`, `withLabel`, `withModelObject`,
+///   `visible`, `enabled`, `inside`, `inRowOf`, `matching`)
 /// - `resolve-one`: the one matching component, or a failure (`Locator.one`)
 /// - `resolve-all`: every matching component (`Locator.all`)
 /// - `check-exists`: whether anything matches (`Locator.existsIn`)
@@ -25,9 +25,14 @@
 /// - **tree order**: the order in which `MarkupContainer.visitChildren` visits the
 ///   descendants: depth first, a parent before its children, children in the order they were
 ///   added.
-/// - **row**: a `ListItem`, which `ListView` renders for each element of its list. A
-///   `RefreshingView` or `DataView` renders an `Item`, which extends `ListItem`. The row's
-///   model object is its element.
+/// - **row**: a direct child of a repeater (`AbstractRepeater`). `ListView` renders a `ListItem`
+///   for each element of its list, `RefreshingView` and `DataView` an `Item`, which extends
+///   `ListItem`. A `RepeatingView` holds whatever children it was given, and a `Loop` a
+///   `LoopItem` per index, which has no model unless the loop gives it one. The row's model
+///   object is its element.
+/// - **label**: the text of a component's label model (`ILabelProvider.getLabel()`), which form
+///   components have. Wicket sets it from `setLabel`, or from the text of a `<wicket:label>` in
+///   the markup when the field has no label yet; a plain `<label wicket:for>` leaves it unset.
 /// - **path**: a component's path relative to the root, its ids joined by `:`. With a page as
 ///   the root it is the page-relative path that WicketTester takes.
 /// - **class name**: a class's simple name, or for an anonymous class the simple name of its
@@ -62,6 +67,18 @@
 /// - R2.8 — Where `withModelObject` is given `null`, the locator shall match only components
 ///   whose model object is `null`.
 ///   _(why: a test can then find a field that was cleared)_
+/// - R2.9 — Where `withLabel` is given, the locator shall match only components whose label
+///   equals the given text.
+/// - R2.10 — The locator shall compare a label with the given text ignoring leading and
+///   trailing whitespace in both, and treating every run of whitespace as one space.
+///   _(why: Wicket takes a label from the markup as it is written, line breaks and indentation
+///   included)_
+/// - R2.11 — If reading a component's label throws, then the locator shall treat the component
+///   as not matching `withLabel`.
+/// - R2.12 — Where `withModelObject` is given a type and a predicate, the locator shall match
+///   only components whose model object is of that type and accepted by the predicate.
+///   _(why: entities that are loaded again for every request often equal only themselves, as
+///   for rows in R3.4)_
 ///
 /// ### R3: Refine by position
 /// - R3.1 — Where `inside` is given, the locator shall match only components with an ancestor
@@ -75,21 +92,28 @@
 ///   only components inside a row whose model object is of that type and accepted by the
 ///   predicate.
 ///   _(why: entities that are loaded again for every request often equal only themselves)_
+/// - R3.5 — Where `inRowOf` is given, the locator shall match only components inside a row of
+///   any other repeater whose model object equals the argument, `RepeatingView` rows included.
+/// - R3.6 — If reading a row's model object throws, then the locator shall treat that row as not
+///   matching `inRowOf`.
+///   _(why: a `RepeatingView` child without a model of its own inherits one, for example from a
+///   `CompoundPropertyModel`, and that model may throw, as in R2.7)_
 ///
 /// ### R4: Combine refinements
 /// - R4.1 — The locator shall match only components that meet all its criteria.
 /// - R4.2 — When a locator is refined, the locator shall return a new locator and leave the
 ///   original unchanged.
 ///   _(why: a page object can then keep base locators and refine them per test)_
-/// - R4.3 — If any method of a locator other than `withModelObject` is given `null`, then the
-///   locator shall throw a `NullPointerException` that names the parameter.
+/// - R4.3 — If any method of a locator is given `null`, other than the model object of
+///   `withModelObject`, then the locator shall throw a `NullPointerException` that names the
+///   parameter.
 /// - R4.4 — The locator shall read a component's model object, and apply a `matching`
 ///   predicate to it, only once the component has met the locator's type and all its other
 ///   criteria, whatever order the refinements were given in.
 ///   _(why: models of unrelated components may load data or fail outside their own page, and a
 ///   predicate may only make sense for the components it was written for)_
-/// - R4.5 — If `matching` or `inRowOf` is given a blank description, then the locator shall
-///   throw an `IllegalArgumentException`.
+/// - R4.5 — If `matching`, `inRowOf` or `withModelObject` is given a blank description, then
+///   the locator shall throw an `IllegalArgumentException`.
 ///   _(why: the description is what failure messages show)_
 ///
 /// ### R5: Resolve
@@ -117,7 +141,9 @@
 /// | `visible` | `visible` before the type | `a visible Label` |
 /// | `enabled` | `enabled` before the type | `an enabled Button`, `a visible, enabled Button` |
 /// | `withId` | ` with id "<id>"` | `a Label with id "customer"` |
+/// | `withLabel` | ` with label "<text>"` | `a TextField with label "Customer"` |
 /// | `withModelObject` | ` with model object <value>` | `a Label with model object "ACME"` |
+/// | `withModelObject` with a predicate | ` whose model object is <a or an> <class name> that <description>` | `a Panel whose model object is an Order that has id 42` |
 /// | `matching` | ` that <description>`, several joined by ` and ` | `a TextField that is required` |
 /// | `inside` | ` inside <the other locator's description>` | `a Label inside a Panel with id "user"` |
 /// | `inRowOf` | ` in the row of <value>` | `a Label in the row of Order[id=42]` |
@@ -139,9 +165,22 @@
 ///   _(why: a component of another type or hidden is the likelier culprit than one more
 ///   component of the right type with another id)_
 /// - R7.5 — The locator shall say what differs for each criterion as the table below shows.
-/// - R7.6 — If evaluating a criterion throws while the locator looks for near misses, then the
-///   locator shall count that criterion as missed.
+/// - R7.6 — If evaluating a criterion throws while the locator looks for near misses or for the
+///   components of R7.7, then the locator shall count that criterion as missed.
 ///   _(why: a failure message must not fail itself)_
+/// - R7.7 — Where nothing matches and no component is a near miss, the locator shall add the
+///   line `Components of type <class name>:` and list the root's descendants of the locator's
+///   type, one line `  - <path> (<what differs>; <what differs>)` each, at most 5, then
+///   `  - and <k> more`. Each line shall say what differs for every criterion the component
+///   misses, in the order of the table below, leaving out the criteria that R4.4 keeps the
+///   locator from evaluating. It shall order the components by how many criteria they miss,
+///   fewest first, and in tree order within each.
+///   _(why: after a refactoring a component often misses two criteria at once, such as a
+///   renamed id in a row that moved, and a message that only says "found none" leaves the
+///   reader to search the page)_
+/// - R7.8 — Where a locator has at least two criteria, nothing matches, no component is a near
+///   miss and the root has no descendant of the locator's type, the locator shall add the line
+///   `There is no <class name> in <root>.`, with `<root>` as in R7.1.
 ///
 /// | Missed criterion | What differs |
 /// |---|---|
@@ -153,6 +192,7 @@
 /// | `withModelObject` | `has model object <value>`, or `has a model object that cannot be read` |
 /// | `matching` | `does not match "<description>"` |
 /// | `withId` | `has id "<id>"` |
+/// | `withLabel` | `has label "<text>"`, `has no label`, or `has a label that cannot be read` |
 ///
 /// A complete message, for a page with two orders whose rows hold `customerName` labels:
 ///
@@ -160,6 +200,15 @@
 /// Expected exactly one match for a Label with id "customer" in the row of Order[id=42] in OrdersPage, but found none.
 /// Near misses (all criteria but one):
 ///   - orders:0:customerName (has id "customerName")
+/// ```
+///
+/// And for the same page, asked for the row of an order it doesn't show:
+///
+/// ```
+/// Expected exactly one match for a Label with id "customer" in the row of Order[id=99] in OrdersPage, but found none.
+/// Components of type Label:
+///   - orders:0:customerName (is not in the row of Order[id=99]; has id "customerName")
+///   - orders:1:customerName (is not in the row of Order[id=99]; has id "customerName")
 /// ```
 ///
 /// ## Out of scope

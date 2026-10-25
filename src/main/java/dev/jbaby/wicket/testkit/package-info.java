@@ -18,12 +18,13 @@
 /// - `wrap`: wrap a WicketTester (`WicketTestkit.of`)
 /// - `click`: click a link (`WicketTestkit.click`)
 /// - `fire-ajax-event`: fire an Ajax event on a component (`WicketTestkit.ajax`)
-/// - `fill-in-form`: set field values, fire Ajax events with them and submit a form
-///   (`WicketTestkit.form`, `FormHelper.set`, `FormHelper.select`, `FormHelper.ajax`,
-///   `FormHelper.submit`, and `FormHelper.formTester` for anything else)
+/// - `fill-in-form`: set field values, choose choices, check check boxes, fire Ajax events with
+///   them and submit a form (`WicketTestkit.form`, `FormHelper.set`, `FormHelper.select`,
+///   `FormHelper.choose`, `FormHelper.chooseAll`, `FormHelper.check`, `FormHelper.uncheck`,
+///   `FormHelper.ajax`, `FormHelper.submit`, and `FormHelper.formTester` for anything else)
 /// - `assert`: assert about one component (`WicketTestkit.assertLabel`, `assertVisible`,
 ///   `assertInvisible`, `assertEnabled`, `assertDisabled`, `assertModelObject`,
-///   `assertFeedback`, `assertOnAjaxResponse`)
+///   `assertFeedback`, `assertFeedbackOn`, `assertOnAjaxResponse`)
 /// - `count`: assert how many components match (`WicketTestkit.assertCount`)
 /// - `get-path`: the page-relative path, for any WicketTester method the testkit doesn't wrap
 ///   (`WicketTestkit.pathOf`)
@@ -35,6 +36,8 @@
 ///   page, or for the form helper's methods, inside the form.
 /// - **prefix**: `<description> (at <path>): `, made of the locator's description and the
 ///   located component's page-relative path.
+/// - **choice**: an element of a choice field's list of choices (`AbstractChoice.getChoices()`),
+///   compared with `equals`.
 ///
 /// Description, path, root and the failure messages of a locator are defined in
 /// `dev.jbaby.wicket.testkit.locator`.
@@ -85,9 +88,10 @@
 ///   the located button as `FormTester.submit` does.
 /// - R4.7 — Where the located button is an `AjaxButton` or an `AjaxSubmitLink`, the form helper
 ///   shall submit the form through Ajax with the values set so far.
-/// - R4.8 — If the located field or button is not enabled in hierarchy, then `set`, `select`
-///   and `submit` with a button shall throw an `AssertionError` whose message is the prefix
-///   followed by `the component is not enabled in hierarchy`.
+/// - R4.8 — If the located field or button is not enabled in hierarchy, then `set`, `select`,
+///   `choose`, `chooseAll`, `check`, `uncheck` and `submit` with a button shall throw an
+///   `AssertionError` whose message is the prefix followed by
+///   `the component is not enabled in hierarchy`.
 ///   _(why: Wicket ignores the input of a disabled field, so the value would be lost without
 ///   a word, and nobody can click a disabled button, though FormTester submits through it)_
 /// - R4.9 — When `form` is called again for the same form before the tester has handled
@@ -99,8 +103,8 @@
 ///   followed by
 ///   `the tester has handled a request since this form helper was created; call form again`.
 ///   _(why: the values a FormTester set are gone after a request, also after an Ajax submit)_
-/// - R4.11 — If the located field has a `FormComponentUpdatingBehavior`, then `select` shall
-///   throw an `AssertionError` whose message is the prefix followed by
+/// - R4.11 — If the located field has a `FormComponentUpdatingBehavior`, then `select` and
+///   `choose` shall throw an `AssertionError` whose message is the prefix followed by
 ///   `the component has a FormComponentUpdatingBehavior, which FormTester would run at once,
 ///   losing the values set so far; use formTester() to select it anyway`.
 ///   _(why: `FormTester.select` sends a request of its own for that behavior)_
@@ -110,6 +114,24 @@
 ///   _(why: an `AjaxFormComponentUpdatingBehavior` reads the field's input from the request)_
 /// - R4.13 — When `formTester` is called, the form helper shall return its `FormTester`, with
 ///   the values set so far.
+/// - R4.14 — When `choose` is called with a choice, the form helper shall select the first of
+///   the located field's choices that equals it, as `FormTester.select` does with that
+///   choice's index.
+///   _(why: an index silently selects another choice once the choices are reordered)_
+/// - R4.15 — If a choice given to `choose` or `chooseAll` equals none of the located field's
+///   choices, then the form helper shall throw an `AssertionError` whose message is the prefix
+///   followed by `the component has no choice <value>; its choices are <choices>`. `<choices>`
+///   is the field's choices separated by `, `, at most 10 followed by `, and <k> more`, or
+///   `none` if it has none. Values appear as a locator's description shows them.
+/// - R4.16 — When `chooseAll` is called with choices, the form helper shall replace the located
+///   field's selection with exactly those choices, as `FormTester.selectMultiple` does with
+///   their indexes and `replace` set.
+/// - R4.17 — When `chooseAll` is called without choices, the form helper shall clear the
+///   located field's selection.
+/// - R4.18 — When `check` is called, the form helper shall check the located check box, as
+///   `FormTester.setValue` does with `true`.
+/// - R4.19 — When `uncheck` is called, the form helper shall uncheck the located check box, as
+///   `FormTester.setValue` does with `false`.
 ///
 /// ### R5: Assert about one component
 /// - R5.1 — When `assertLabel` is called, the testkit shall check the located label's text as
@@ -132,6 +154,12 @@
 /// - R5.9 — When `assertModelObject` is given `null`, the testkit shall check that the located
 ///   component's model object is `null`.
 ///   _(why: a test can then assert that a field was cleared)_
+/// - R5.10 — When `assertFeedbackOn` is called with messages, the testkit shall check that the
+///   located component has exactly those feedback messages, in any order, as
+///   `WicketTester.assertFeedbackMessages` does with a `ComponentFeedbackMessageFilter` for the
+///   component.
+/// - R5.11 — When `assertFeedbackOn` is called without messages, the testkit shall check that
+///   the located component has no feedback messages.
 ///
 /// ### R6: Count
 /// - R6.1 — When `assertCount` is called and exactly the given number of components match, the
@@ -149,7 +177,8 @@
 ///   shall let it through unchanged.
 ///   _(why: an exception from the application under test is not a failed assertion)_
 /// - R7.3 — If the located component is not visible in hierarchy, then `click`, `ajax`, `form`,
-///   `set`, `select`, the form helper's `ajax`, `submit` with a button, `assertLabel`,
+///   `set`, `select`, `choose`, `chooseAll`, `check`, `uncheck`, the form helper's `ajax`,
+///   `submit` with a button, `assertLabel`,
 ///   `assertModelObject`, `assertEnabled`, `assertDisabled` and `assertFeedback` shall throw an
 ///   `AssertionError` whose message is the prefix followed by
 ///   `the component is not visible in hierarchy`.
@@ -177,8 +206,8 @@
 /// - the component started with `startComponentInPage` itself as the located component:
 ///   WicketTester's paths can't address it, only its descendants
 /// - a method for every WicketTester method: pass `pathOf` to the tester instead
-/// - feedback messages of a single form component: give `kit.one(locator)` to WicketTester's
-///   `assertFeedbackMessages` with a `ComponentFeedbackMessageFilter`
+/// - file uploads: use `formTester()`
+/// - choosing a choice by the text it shows: `choose` takes the choice itself
 /// - a base class for page objects; the README shows page objects built on locators
 /// - Spring and `@WicketTest` integration (the dev.jbaby Wicket Spring Boot starter's test
 ///   module)

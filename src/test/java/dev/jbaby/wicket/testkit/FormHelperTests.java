@@ -8,11 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.OrderFormPage;
 import dev.jbaby.wicket.testkit.locator.Locator;
+import java.util.List;
 import org.apache.wicket.ajax.markup.html.form.AjaxButton;
 import org.apache.wicket.ajax.markup.html.form.AjaxSubmitLink;
 import org.apache.wicket.markup.html.form.Button;
+import org.apache.wicket.markup.html.form.CheckBox;
+import org.apache.wicket.markup.html.form.CheckBoxMultipleChoice;
 import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.Form;
+import org.apache.wicket.markup.html.form.ListMultipleChoice;
 import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.util.tester.WicketTester;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -30,6 +34,9 @@ class FormHelperTests {
     final Locator<Form> order = locate(Form.class).withId("order");
     final Locator<TextField> customer = locate(TextField.class).withId("customer");
     final Locator<DropDownChoice> country = locate(DropDownChoice.class).withId("country");
+    final Locator<DropDownChoice> quantity = locate(DropDownChoice.class).withId("quantity");
+    final Locator<CheckBox> giftWrap = locate(CheckBox.class).withId("giftWrap");
+    final Locator<CheckBoxMultipleChoice> extras = locate(CheckBoxMultipleChoice.class).withId("extras");
 
     WicketTester tester;
     WicketTestkit kit;
@@ -114,7 +121,7 @@ class FormHelperTests {
     }
 
     @Test
-    @DisplayName("R4.8 set, select and submit with a button fail on a field or button that is not enabled in hierarchy")
+    @DisplayName("R4.8 set, select, choose, chooseAll, check, uncheck and submit with a button fail on a field or button that is not enabled in hierarchy")
     void disabledFieldsAndButtonsAreReported() {
         assertThatThrownBy(() -> kit.form(order).submit(locate(Button.class).withId("restore")))
             .isExactlyInstanceOf(AssertionError.class)
@@ -126,6 +133,19 @@ class FormHelperTests {
             .hasMessage("a TextField with id \"note\" (at order:archived:note): "
                 + "the component is not enabled in hierarchy");
         assertThatThrownBy(() -> kit.form(order).select(locate(DropDownChoice.class).withId("region"), 1))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessageEndingWith("): the component is not enabled in hierarchy");
+        var insured = locate(CheckBox.class).withId("insured");
+        assertAll(
+            () -> assertDisabled(() -> kit.form(order).choose(locate(DropDownChoice.class).withId("region"), "Germany")),
+            () -> assertDisabled(() -> kit.form(order).chooseAll(locate(ListMultipleChoice.class).withId("services"),
+                "tracking")),
+            () -> assertDisabled(() -> kit.form(order).check(insured)),
+            () -> assertDisabled(() -> kit.form(order).uncheck(insured)));
+    }
+
+    static void assertDisabled(ThrowingCallable call) {
+        assertThatThrownBy(call)
             .isExactlyInstanceOf(AssertionError.class)
             .hasMessageEndingWith("): the component is not enabled in hierarchy");
     }
@@ -154,13 +174,19 @@ class FormHelperTests {
     }
 
     @Test
-    @DisplayName("R4.11 select fails on a field with a FormComponentUpdatingBehavior")
+    @DisplayName("R4.11 select and choose fail on a field with a FormComponentUpdatingBehavior")
     void selectFailsOnAFieldThatWouldSubmitAtOnce() {
-        assertThatThrownBy(() -> kit.form(order).select(locate(DropDownChoice.class).withId("speed"), 1))
+        var speed = locate(DropDownChoice.class).withId("speed");
+        var message = "a DropDownChoice with id \"speed\" (at order:speed): the component has a "
+            + "FormComponentUpdatingBehavior, which FormTester would run at once, losing the values set so far;"
+            + " use formTester() to select it anyway";
+
+        assertThatThrownBy(() -> kit.form(order).select(speed, 1))
             .isExactlyInstanceOf(AssertionError.class)
-            .hasMessage("a DropDownChoice with id \"speed\" (at order:speed): the component has a "
-                + "FormComponentUpdatingBehavior, which FormTester would run at once, losing the values set so far;"
-                + " use formTester() to select it anyway");
+            .hasMessage(message);
+        assertThatThrownBy(() -> kit.form(order).choose(speed, "express"))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessage(message);
     }
 
     @Test
@@ -183,6 +209,92 @@ class FormHelperTests {
     }
 
     @Test
+    @DisplayName("R4.14 choose selects the choice that equals the given one")
+    void chooseSelectsTheEqualChoice() {
+        kit.form(order).choose(country, "Switzerland").choose(quantity, 12).submit();
+
+        tester.assertModelValue("order:details:country", "Switzerland");
+        tester.assertModelValue("order:quantity", 12);
+    }
+
+    @Test
+    @DisplayName("R4.15 choose and chooseAll fail on a choice the field doesn't have, and list the choices it has")
+    void chooseFailsOnAnUnknownChoice() {
+        assertThatThrownBy(() -> kit.form(order).choose(country, "France"))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessage("a DropDownChoice with id \"country\" (at order:details:country): the component has no "
+                + "choice \"France\"; its choices are \"Austria\", \"Germany\", \"Switzerland\"");
+        assertThatThrownBy(() -> kit.form(order).choose(quantity, 13))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessageEndingWith("): the component has no choice 13; its choices are "
+                + "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, and 2 more");
+        assertThatThrownBy(() -> kit.form(order).choose(locate(DropDownChoice.class).withId("slot"), "morning"))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessageEndingWith("): the component has no choice \"morning\"; its choices are none");
+        assertThatThrownBy(() -> kit.form(order).chooseAll(extras, "tracking", "gift card"))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessageEndingWith("): the component has no choice \"gift card\"; its choices are "
+                + "\"insurance\", \"tracking\", \"signature\"");
+    }
+
+    @Test
+    @DisplayName("R4.16 chooseAll replaces the selection with exactly the given choices")
+    void chooseAllReplacesTheSelection() {
+        kit.form(order).chooseAll(extras, "signature", "insurance").submit();
+
+        tester.assertModelValue("order:extras", List.of("insurance", "signature"));
+    }
+
+    @Test
+    @DisplayName("R4.17 chooseAll without choices clears the selection")
+    void chooseAllWithoutChoicesClearsTheSelection() {
+        kit.form(order).chooseAll(extras).submit();
+
+        tester.assertModelValue("order:extras", List.of());
+    }
+
+    @Test
+    @DisplayName("R4.18 check checks the check box")
+    void checkChecksTheCheckBox() {
+        kit.form(order).check(giftWrap).submit();
+
+        tester.assertModelValue("order:giftWrap", true);
+    }
+
+    @Test
+    @DisplayName("R4.19 uncheck unchecks the check box")
+    void uncheckUnchecksTheCheckBox() {
+        kit.form(order).check(giftWrap).submit();
+        kit.form(order).uncheck(giftWrap).submit();
+
+        tester.assertModelValue("order:giftWrap", false);
+    }
+
+    @Test
+    @DisplayName("R5.10 assertFeedbackOn checks the component's own feedback messages")
+    void assertFeedbackOnChecksTheComponentsMessages() {
+        kit.form(order).set(customer, "").submit();
+
+        kit.assertFeedbackOn(customer, "'Customer' is required.");
+        assertThatThrownBy(() -> kit.assertFeedbackOn(customer, "Customer is missing."))
+            .isInstanceOf(AssertionError.class)
+            .hasMessageStartingWith("a TextField with id \"customer\" (at order:customer): ")
+            .hasMessageContaining("'Customer' is required.");
+    }
+
+    @Test
+    @DisplayName("R5.11 assertFeedbackOn without messages checks that the component has none")
+    void assertFeedbackOnWithoutMessagesChecksForNone() {
+        kit.form(order).set(customer, "").submit();
+
+        kit.assertFeedbackOn(country);
+        assertThatThrownBy(() -> kit.assertFeedbackOn(customer))
+            .isInstanceOf(AssertionError.class)
+            .hasMessageStartingWith("a TextField with id \"customer\" (at order:customer): ")
+            .hasMessageContaining("'Customer' is required.");
+    }
+
+    @Test
     @DisplayName("R3.4 the form helper's ajax fails if the component has no Ajax behavior for the event")
     void ajaxFailsWithoutABehaviorForTheEvent() {
         assertThatThrownBy(() -> kit.form(order).ajax(customer, "change"))
@@ -202,6 +314,20 @@ class FormHelperTests {
             () -> assertThatNullPointerException().isThrownBy(() -> form.set(customer, null))
                 .withMessageContaining("value"),
             () -> assertThatNullPointerException().isThrownBy(() -> form.select(null, 1))
+                .withMessageContaining("field"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.choose(null, "Germany"))
+                .withMessageContaining("field"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.choose(country, null))
+                .withMessageContaining("choice"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.chooseAll(null, "tracking"))
+                .withMessageContaining("field"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.chooseAll(extras, (Object[]) null))
+                .withMessageContaining("choices"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.chooseAll(extras, "tracking", null))
+                .withMessageContaining("choices"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.check(null))
+                .withMessageContaining("field"),
+            () -> assertThatNullPointerException().isThrownBy(() -> form.uncheck(null))
                 .withMessageContaining("field"),
             () -> assertThatNullPointerException().isThrownBy(() -> form.submit(null))
                 .withMessageContaining("button"),
@@ -232,6 +358,11 @@ class FormHelperTests {
         assertAll(
             () -> assertInvisible(() -> kit.form(order).set(locate(TextField.class).withId("coupon"), "SAVE10")),
             () -> assertInvisible(() -> kit.form(order).select(locate(DropDownChoice.class).withId("gift"), 0)),
+            () -> assertInvisible(() -> kit.form(order).choose(locate(DropDownChoice.class).withId("gift"), "Germany")),
+            () -> assertInvisible(() -> kit.form(order).chooseAll(locate(ListMultipleChoice.class).withId("addons"),
+                "tracking")),
+            () -> assertInvisible(() -> kit.form(order).check(locate(CheckBox.class).withId("fragile"))),
+            () -> assertInvisible(() -> kit.form(order).uncheck(locate(CheckBox.class).withId("fragile"))),
             () -> assertInvisible(() -> kit.form(order).submit(locate(Button.class).withId("apply"))),
             () -> assertInvisible(() -> kit.form(order).ajax(locate(DropDownChoice.class).withId("gift"), "change")));
     }

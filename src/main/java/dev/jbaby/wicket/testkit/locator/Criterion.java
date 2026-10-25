@@ -2,9 +2,11 @@ package dev.jbaby.wicket.testkit.locator;
 
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
-import org.apache.wicket.markup.html.list.ListItem;
+import org.apache.wicket.markup.html.form.ILabelProvider;
+import org.apache.wicket.markup.repeater.AbstractRepeater;
 
 /// One refinement of a locator: a condition a component has to meet besides the locator's type.
 sealed interface Criterion {
@@ -24,6 +26,19 @@ sealed interface Criterion {
     /// Whether this criterion may be tested only for components of the locator's type, because
     /// it reads the model object or runs the caller's predicate.
     default boolean needsType() {
+        return false;
+    }
+
+    /// Whether the component is inside a row whose model object can be read and is accepted.
+    private static boolean inRow(Component component, Predicate<Object> element) {
+        for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent.getParent() instanceof AbstractRepeater) {
+                var modelObject = ModelObject.read(parent);
+                if (modelObject != ModelObject.UNREADABLE && element.test(modelObject)) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -101,17 +116,13 @@ sealed interface Criterion {
         }
     }
 
-    /// A row is a `ListItem`; `Item`, which `RefreshingView` renders, extends it.
+    /// A row is a direct child of a repeater: a `ListItem` of a `ListView`, an `Item` of a
+    /// `RefreshingView`, or any child of a `RepeatingView`.
     record InRowOf(Object element) implements Criterion {
 
         @Override
         public boolean test(Component component) {
-            for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
-                if (parent instanceof ListItem && element.equals(parent.getDefaultModelObject())) {
-                    return true;
-                }
-            }
-            return false;
+            return inRow(component, element::equals);
         }
 
         @Override
@@ -135,15 +146,7 @@ sealed interface Criterion {
 
         @Override
         public boolean test(Component component) {
-            for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
-                if (parent instanceof ListItem) {
-                    var element = parent.getDefaultModelObject();
-                    if (elementType.isInstance(element) && predicate.test(element)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
+            return inRow(component, element -> elementType.isInstance(element) && predicate.test(element));
         }
 
         @Override
@@ -180,6 +183,11 @@ sealed interface Criterion {
 
         @Override
         public String whatDiffers(Component component) {
+            return modelObjectOf(component);
+        }
+
+        /// What a near miss says about the component's model object.
+        private static String modelObjectOf(Component component) {
             var actual = read(component);
             return actual == UNREADABLE ? "has a model object that cannot be read"
                 : "has model object " + Words.value(actual);
@@ -192,6 +200,38 @@ sealed interface Criterion {
             } catch (RuntimeException e) {
                 return UNREADABLE;
             }
+        }
+
+        @Override
+        public int nearMissOrder() {
+            return 5;
+        }
+
+        @Override
+        public boolean needsType() {
+            return true;
+        }
+    }
+
+    /// The predicate is only ever applied to model objects of the given type.
+    record ModelObjectWhere(Class<?> modelObjectType, Predicate<Object> predicate, String description)
+            implements Criterion {
+
+        @Override
+        public boolean test(Component component) {
+            var actual = ModelObject.read(component);
+            return actual != ModelObject.UNREADABLE && modelObjectType.isInstance(actual) && predicate.test(actual);
+        }
+
+        @Override
+        public String phrase() {
+            return "whose model object is " + Words.withArticle(Words.className(modelObjectType)) + " that "
+                + description;
+        }
+
+        @Override
+        public String whatDiffers(Component component) {
+            return ModelObject.modelObjectOf(component);
         }
 
         @Override
@@ -254,6 +294,58 @@ sealed interface Criterion {
         @Override
         public int nearMissOrder() {
             return 7;
+        }
+    }
+
+    /// A component that provides no label, or a label model whose object is `null`, has no label.
+    record LabelText(String text) implements Criterion {
+
+        private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
+        /// Stands for a label that could not be read.
+        private static final Object UNREADABLE = new Object();
+
+        @Override
+        public boolean test(Component component) {
+            var actual = read(component);
+            return actual != UNREADABLE && normalized(text).equals(actual);
+        }
+
+        @Override
+        public String phrase() {
+            return "with label " + Words.value(text);
+        }
+
+        @Override
+        public String whatDiffers(Component component) {
+            var actual = read(component);
+            return actual == UNREADABLE ? "has a label that cannot be read"
+                : actual == null ? "has no label" : "has label " + Words.value(actual);
+        }
+
+        /// The component's label with its whitespace normalized, `null` if it has none, or
+        /// `UNREADABLE` if reading it throws.
+        private static Object read(Component component) {
+            if (!(component instanceof ILabelProvider<?> provider)) {
+                return null;
+            }
+            try {
+                var label = provider.getLabel();
+                var object = label == null ? null : label.getObject();
+                return object == null ? null : normalized(String.valueOf(object));
+            } catch (RuntimeException e) {
+                return UNREADABLE;
+            }
+        }
+
+        /// The text without whitespace at either end, and every run of whitespace as one space.
+        private static String normalized(String text) {
+            return WHITESPACE.matcher(text.strip()).replaceAll(" ");
+        }
+
+        @Override
+        public int nearMissOrder() {
+            return 8;
         }
     }
 }

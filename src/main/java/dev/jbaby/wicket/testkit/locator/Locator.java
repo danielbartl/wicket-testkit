@@ -69,6 +69,23 @@ public final class Locator<T extends Component> {
         return with(new Criterion.Id(notNull(id, "id")));
     }
 
+    /// Narrows this locator down to components with a label, as form components have.
+    ///
+    /// ```java
+    /// locate(TextField.class).withLabel("Customer")
+    /// ```
+    ///
+    /// The label is the text of the component's label model. Wicket sets it from `setLabel`, or
+    /// from the text of a `<wicket:label>` in the markup; a plain `<label wicket:for>` leaves it
+    /// unset. Whitespace at either end doesn't count, and every run of whitespace counts as one
+    /// space. A label that can't be read doesn't match.
+    ///
+    /// @param text the label's text
+    /// @return a new locator with this criterion added
+    public Locator<T> withLabel(String text) {
+        return with(new Criterion.LabelText(notNull(text, "text")));
+    }
+
     /// Narrows this locator down to components whose model object equals the given one.
     ///
     /// ```java
@@ -83,6 +100,34 @@ public final class Locator<T extends Component> {
     /// @return a new locator with this criterion added
     public Locator<T> withModelObject(Object modelObject) {
         return with(new Criterion.ModelObject(modelObject));
+    }
+
+    /// Narrows this locator down to components whose model object is of the given type and passes
+    /// a predicate. Use it for model objects that don't equal each other across requests, such as
+    /// entities a `LoadableDetachableModel` loads again. The description says what the predicate
+    /// checks.
+    ///
+    /// ```java
+    /// locate(OrderPanel.class).withModelObject(Order.class, o -> o.getId() == 42, "has id 42")
+    /// ```
+    ///
+    /// The model object is read only once a component met every other criterion; a model object
+    /// that can't be read doesn't match.
+    ///
+    /// @param modelObjectType the type the model object has to be of
+    /// @param predicate the check the model object has to pass
+    /// @param description what the predicate checks, completing "whose model object is an Order
+    ///     that …"
+    /// @param <M> the type of the model object
+    /// @return a new locator with this criterion added
+    /// @throws IllegalArgumentException if the description is blank
+    public <M> Locator<T> withModelObject(Class<M> modelObjectType, Predicate<? super M> predicate,
+            String description) {
+        notNull(modelObjectType, "modelObjectType");
+        notNull(predicate, "predicate");
+        @SuppressWarnings("unchecked") // ModelObjectWhere applies it to model objects of type M only
+        var anyModelObject = (Predicate<Object>) predicate;
+        return with(new Criterion.ModelObjectWhere(modelObjectType, anyModelObject, described(description)));
     }
 
     /// Narrows this locator down to components that are visible in hierarchy: they and all
@@ -122,9 +167,9 @@ public final class Locator<T extends Component> {
         return with(new Criterion.Inside(notNull(ancestor, "ancestor")));
     }
 
-    /// Narrows this locator down to components in the row of an element: inside a repeater item
-    /// (a `ListItem`, as rendered by `ListView`, `RefreshingView` and `DataView`) whose model
-    /// object equals the element.
+    /// Narrows this locator down to components in the row of an element: inside a direct child of
+    /// a repeater whose model object equals the element. Rows are the `ListItem`s of a `ListView`,
+    /// the `Item`s of a `RefreshingView` or `DataView`, and the children of a `RepeatingView`.
     ///
     /// ```java
     /// locate(Label.class).withId("customer").inRowOf(order)
@@ -137,7 +182,7 @@ public final class Locator<T extends Component> {
     }
 
     /// Narrows this locator down to components in the row of an element that a predicate accepts:
-    /// inside a repeater item whose model object is of the given type and passes the predicate.
+    /// inside a row whose model object is of the given type and passes the predicate.
     /// Use it for elements that don't equal each other across requests, such as entities a
     /// `LoadableDetachableModel` loads again. The description says what the predicate checks.
     ///
@@ -154,12 +199,9 @@ public final class Locator<T extends Component> {
     public <E> Locator<T> inRowOf(Class<E> elementType, Predicate<? super E> predicate, String description) {
         notNull(elementType, "elementType");
         notNull(predicate, "predicate");
-        if (notNull(description, "description").isBlank()) {
-            throw new IllegalArgumentException("description must not be blank");
-        }
         @SuppressWarnings("unchecked") // InRowWhere applies it to elements of type E only
         var anyElement = (Predicate<Object>) predicate;
-        return with(new Criterion.InRowWhere(elementType, anyElement, description));
+        return with(new Criterion.InRowWhere(elementType, anyElement, described(description)));
     }
 
     /// Narrows this locator down to components that a predicate accepts. The description says
@@ -177,12 +219,9 @@ public final class Locator<T extends Component> {
     /// @throws IllegalArgumentException if the description is blank
     public Locator<T> matching(Predicate<? super T> predicate, String description) {
         notNull(predicate, "predicate");
-        if (notNull(description, "description").isBlank()) {
-            throw new IllegalArgumentException("description must not be blank");
-        }
         @SuppressWarnings("unchecked") // matches() applies it to components of type T only
         var anyComponent = (Predicate<Component>) predicate;
-        return with(new Criterion.Matching(anyComponent, description));
+        return with(new Criterion.Matching(anyComponent, described(description)));
     }
 
     /// Finds the one component this locator matches.
@@ -199,7 +238,9 @@ public final class Locator<T extends Component> {
         var matches = all(root);
         if (matches.size() != 1) {
             var nearMisses = matches.isEmpty() ? nearMisses(root) : List.<FailureMessage.NearMiss>of();
-            throw new AssertionError(FailureMessage.notExactlyOne(this, root, matches, nearMisses));
+            var candidates = matches.isEmpty() && nearMisses.isEmpty() ? candidates(root)
+                : List.<FailureMessage.Candidate>of();
+            throw new AssertionError(FailureMessage.notExactlyOne(this, root, matches, nearMisses, candidates));
         }
         return matches.get(0);
     }
@@ -252,6 +293,24 @@ public final class Locator<T extends Component> {
         return Objects.requireNonNull(value, () -> parameter + " must not be null");
     }
 
+    /// The description, if it isn't blank.
+    private static String described(String description) {
+        if (notNull(description, "description").isBlank()) {
+            throw new IllegalArgumentException("description must not be blank");
+        }
+        return description;
+    }
+
+    /// The type of the components this locator finds.
+    Class<T> type() {
+        return type;
+    }
+
+    /// Whether this locator has a criterion besides its type.
+    boolean isRefined() {
+        return !criteria.isEmpty();
+    }
+
     /// Whether the component meets every criterion of this locator.
     boolean matches(Component component) {
         return type.isInstance(component)
@@ -288,6 +347,38 @@ public final class Locator<T extends Component> {
         return Optional.ofNullable(miss);
     }
 
+    /// The root's descendants of this locator's type, with what differs for each criterion they
+    /// miss, fewest misses first, then in tree order. A locator with its type as the only
+    /// criterion has none.
+    private List<FailureMessage.Candidate> candidates(MarkupContainer root) {
+        var candidates = new ArrayList<FailureMessage.Candidate>();
+        if (isRefined()) {
+            root.visitChildren(type, (component, visit) -> candidates.add(candidate(component)));
+            candidates.sort(Comparator.comparingInt(candidate -> candidate.whatDiffers().size()));
+        }
+        return candidates;
+    }
+
+    /// The component with what differs for each criterion it misses, in the order of near misses.
+    /// The criteria that need the type are tested only if it met all the others, and a criterion
+    /// that throws counts as missed.
+    private FailureMessage.Candidate candidate(Component component) {
+        var missed = missed(component, false);
+        if (missed.isEmpty()) {
+            missed = missed(component, true);
+        }
+        return new FailureMessage.Candidate(component, missed.stream()
+            .sorted(Comparator.comparingInt(Criterion::nearMissOrder))
+            .map(criterion -> criterion.whatDiffers(component))
+            .toList());
+    }
+
+    private List<Criterion> missed(Component component, boolean needingType) {
+        return criteria.stream()
+            .filter(criterion -> criterion.needsType() == needingType && !passes(criterion, component))
+            .toList();
+    }
+
     private static boolean passes(Criterion criterion, Component component) {
         try {
             return criterion.test(component);
@@ -313,7 +404,8 @@ public final class Locator<T extends Component> {
         var text = new StringBuilder(Words.withArticle(
             (adjectives.isEmpty() ? "" : adjectives + " ") + Words.className(type)));
         appendPhrases(text, Criterion.Id.class);
-        appendPhrases(text, Criterion.ModelObject.class);
+        appendPhrases(text, Criterion.LabelText.class);
+        appendPhrases(text, Criterion.ModelObject.class, Criterion.ModelObjectWhere.class);
         var matching = phrases(Criterion.Matching.class).collect(joining(" and "));
         if (!matching.isEmpty()) {
             text.append(" that ").append(matching);

@@ -6,14 +6,18 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import dev.jbaby.wicket.testkit.fixtures.NoOpLink;
 import dev.jbaby.wicket.testkit.fixtures.Order;
+import dev.jbaby.wicket.testkit.fixtures.OrderFormPage;
 import dev.jbaby.wicket.testkit.fixtures.ShopPage;
 import dev.jbaby.wicket.testkit.fixtures.UserPanel;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.Page;
+import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
+import org.apache.wicket.markup.html.form.TextField;
 import org.apache.wicket.markup.html.link.Link;
+import org.apache.wicket.model.IModel;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,14 +123,18 @@ class FailureMessageTests {
     }
 
     @Test
-    @DisplayName("R7.6 a criterion that throws while near misses are looked for counts as missed")
+    @DisplayName("R7.6 a criterion that throws while near misses or components of the type are looked for counts as missed")
     void throwingCriteriaCountAsMissed() {
         var exploding = locate(UserPanel.class).matching(panel -> {
             throw new IllegalStateException("must not escape");
         }, "explodes");
 
+        var user = (MarkupContainer) page.get("user");
+
         assertThat(messageOf(locate(Label.class).withId("missing").inside(exploding), page))
             .startsWith("Expected exactly one match for a Label with id \"missing\" inside an UserPanel that explodes");
+        assertThat(messageOf(locate(Label.class).withId("missing").inside(exploding), user))
+            .endsWith("\nComponents of type Label:\n  - name (is not inside an UserPanel that explodes; has id \"name\")");
     }
 
     @Test
@@ -149,5 +157,65 @@ class FailureMessageTests {
             .endsWith("\n  - title (has model object \"Shop\")");
         assertThat(messageOf(locate(Label.class).withId("title").matching(label -> false, "is bold"), page))
             .endsWith("\n  - title (does not match \"is bold\")");
+        assertThat(messageOf(locate(Label.class).withId("number")
+            .withModelObject(Integer.class, number -> number > 50, "is above 50"), page))
+            .contains("\n  - orders:0:number (has model object 41)\n");
+    }
+
+    @Test
+    @DisplayName("R7.5 a near miss of withLabel says which label the component has, if any")
+    void nearMissesOfWithLabelSayWhatDiffers() {
+        var root = new WebMarkupContainer("root");
+        IModel<String> failing = () -> {
+            throw new IllegalStateException("this label must not be read");
+        };
+        root.add(new TextField<String>("broken").setLabel(failing));
+        tester.startPage(OrderFormPage.class);
+        var formPage = tester.getLastRenderedPage();
+
+        assertThat(messageOf(locate(TextField.class).withId("customer").withLabel("Client"), formPage))
+            .endsWith("\n  - order:customer (has label \"Customer\")");
+        assertThat(messageOf(locate(TextField.class).withId("query").withLabel("Query"), formPage))
+            .endsWith("\n  - search:query (has label \"Search term\")");
+        assertThat(messageOf(locate(TextField.class).withId("note").withLabel("Note"), formPage))
+            .endsWith("\n  - order:archived:note (has no label)");
+        assertThat(messageOf(locate(TextField.class).withId("broken").withLabel("Broken"), root))
+            .endsWith("\n  - broken (has a label that cannot be read)");
+    }
+
+    @Test
+    @DisplayName("R7.7 no near misses: the message lists the components of the locator's type, fewest misses first")
+    void componentsOfTheTypeAreListedWithoutNearMisses() {
+        assertThat(messageOf(locate(Label.class).withId("client").visible().inside(locate(Form.class)), page))
+            .as("note and closed:reason are invisible too, so they come last")
+            .isEqualTo("""
+                Expected exactly one match for a visible Label with id "client" inside a Form in ShopPage, \
+                but found none.
+                Components of type Label:
+                  - title (is not inside a Form; has id "title")
+                  - headline (is not inside a Form; has id "headline")
+                  - locked:hint (is not inside a Form; has id "hint")
+                  - user:name (is not inside a Form; has id "name")
+                  - orders:0:customer (is not inside a Form; has id "customer")
+                  - and 10 more""");
+        assertThat(messageOf(locate(Label.class).withId("client").inside(locate(Form.class)).withModelObject("ACME"),
+            page))
+            .as("the model object is not read for a component that misses other criteria")
+            .contains("\n  - title (is not inside a Form; has id \"title\")\n");
+    }
+
+    @Test
+    @DisplayName("R7.8 no near misses and nothing of the locator's type: the message says so")
+    void aMissingTypeIsNamed() {
+        var closed = (MarkupContainer) page.get("closed");
+
+        assertThat(messageOf(locate(Form.class).withId("order"), page)).isEqualTo("""
+            Expected exactly one match for a Form with id "order" in ShopPage, but found none.
+            There is no Form in ShopPage.""");
+        assertThat(messageOf(locate(Link.class).withId("open"), closed)).endsWith(
+            "\nThere is no Link in WebMarkupContainer \"closed\".");
+        assertThat(messageOf(locate(Form.class), page))
+            .as("not for a locator with its type as the only criterion")
+            .isEqualTo("Expected exactly one match for a Form in ShopPage, but found none.");
     }
 }
