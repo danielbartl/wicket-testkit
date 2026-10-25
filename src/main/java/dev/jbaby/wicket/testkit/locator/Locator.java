@@ -2,6 +2,7 @@ package dev.jbaby.wicket.testkit.locator;
 
 import static java.util.stream.Collectors.joining;
 
+import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -130,7 +131,7 @@ public final class Locator<T extends Component> {
         notNull(predicate, "predicate");
         @SuppressWarnings("unchecked") // ModelObjectWhere applies it to model objects of type M only
         var anyModelObject = (Predicate<Object>) predicate;
-        return with(new Criterion.ModelObjectWhere(modelObjectType, anyModelObject, described(description)));
+        return with(new Criterion.ModelObjectWhere(boxed(modelObjectType), anyModelObject, described(description)));
     }
 
     /// Narrows this locator down to components that are visible in hierarchy: they and all
@@ -204,7 +205,7 @@ public final class Locator<T extends Component> {
         notNull(predicate, "predicate");
         @SuppressWarnings("unchecked") // InRowWhere applies it to elements of type E only
         var anyElement = (Predicate<Object>) predicate;
-        return with(new Criterion.InRowWhere(elementType, anyElement, described(description)));
+        return with(new Criterion.InRowWhere(boxed(elementType), anyElement, described(description)));
     }
 
     /// Narrows this locator down to components that a predicate accepts. The description says
@@ -318,6 +319,11 @@ public final class Locator<T extends Component> {
         return Objects.requireNonNull(value, () -> parameter + " must not be null");
     }
 
+    /// The wrapper type of a primitive type, any other type as it is.
+    private static Class<?> boxed(Class<?> type) {
+        return type.isPrimitive() ? MethodType.methodType(type).wrap().returnType() : type;
+    }
+
     /// The description, if it isn't blank.
     private static String described(String description) {
         if (notNull(description, "description").isBlank()) {
@@ -406,18 +412,19 @@ public final class Locator<T extends Component> {
         var candidates = new ArrayList<FailureMessage.Candidate>();
         if (isRefined()) {
             root.visitChildren(type, (component, visit) -> candidates.add(candidate(component)));
-            candidates.sort(Comparator.comparingInt(candidate -> candidate.whatDiffers().size()));
+            candidates.sort(Comparator.comparingInt(FailureMessage.Candidate::misses));
         }
         return candidates;
     }
 
     /// The component of this locator's type with what differs for each criterion it was tested
-    /// for and missed, in the order of near misses.
+    /// for and missed, in the order of near misses, and how many it misses, untested ones included.
     private FailureMessage.Candidate candidate(Component component) {
-        return new FailureMessage.Candidate(component, misses(component).missed().stream()
+        var misses = misses(component);
+        return new FailureMessage.Candidate(component, misses.missed().stream()
             .sorted(Comparator.comparingInt(Criterion::nearMissOrder))
             .map(criterion -> criterion.whatDiffers(component))
-            .toList());
+            .toList(), misses.count());
     }
 
     private static boolean passes(Criterion criterion, Component component) {

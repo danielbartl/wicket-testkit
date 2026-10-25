@@ -26,6 +26,7 @@ import org.opentest4j.AssertionFailedError;
 class AssertRowsTests {
 
     final Locator<ListView> orders = locate(ListView.class).withId("orders");
+    final Locator<ListView> some = locate(ListView.class).withId("some");
 
     WicketTester tester;
     WicketTestkit kit;
@@ -64,6 +65,11 @@ class AssertRowsTests {
             | rush |
             """);
         kit.assertRows(locate(ListView.class).withId("nothing"), "| customer |");
+        kit.assertRows(some, """
+            | amount |
+            | 1 234  |
+            | 56     |
+            """);
         assertThatThrownBy(() -> kit.assertRows(orders, """
             | number |
             | 42     |
@@ -166,6 +172,37 @@ class AssertRowsTests {
             () -> assertThatIllegalArgumentException()
                 .isThrownBy(() -> kit.assertRows(orders, "| customer | number |\n\n| ACME |"))
                 .withMessage("line 3 of the table has 1 cell, but the header has 2"));
+    }
+
+    @Test
+    @DisplayName("R9.7 rows that are not visible in hierarchy are left out")
+    void invisibleRowsAreLeftOut() {
+        kit.assertRows(some, """
+            | customer       |
+            | ACME           |
+            | O'Brien & Sons |
+            """);
+    }
+
+    @Test
+    @DisplayName("R9.8 cell texts are compared without escaping markup")
+    void cellTextsAreNotEscaped() {
+        var failure = catchThrowableOfType(AssertionFailedError.class, () -> kit.assertRows(some, "| customer |"));
+
+        assertThat(failure.getActual().getEphemeralValue()).isEqualTo("""
+            | customer       |
+            | ACME           |
+            | O'Brien & Sons |""");
+    }
+
+    @Test
+    @DisplayName("R9.9 a component whose model object cannot be read fails with a message that says so")
+    void unreadableModelObjectsAreReported() {
+        assertThatThrownBy(() -> kit.assertRows(some, "| box |"))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessage("a ListView with id \"some\" (at some): row 1 (at some:0) has a component with id \"box\""
+                + " whose model object cannot be read")
+            .hasRootCauseInstanceOf(IllegalStateException.class);
     }
 
     @Test

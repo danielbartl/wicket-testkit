@@ -38,6 +38,7 @@ import org.apache.wicket.model.util.ListModel;
 ///   extras         CheckBoxMultipleChoice of EXTRAS, "tracking" at first
 ///   quantity       DropDownChoice of QUANTITIES, 1 at first
 ///   slot           DropDownChoice without choices
+///   reorder        DropDownChoice of Order.ALL
 ///   archived       container, disabled
 ///     note         TextField
 ///     region       DropDownChoice of COUNTRIES
@@ -75,6 +76,7 @@ public class OrderFormPage extends WebPage {
     private Collection<String> extras = new ArrayList<>(List.of("tracking"));
     private Integer quantity = 1;
     private String slot;
+    private Order reorder;
     private String note;
     private String region;
     private String coupon;
@@ -120,6 +122,7 @@ public class OrderFormPage extends WebPage {
         order.add(new CheckBoxMultipleChoice<>("extras", PropertyModel.<Collection<String>>of(this, "extras"), EXTRAS));
         order.add(new DropDownChoice<>("quantity", PropertyModel.<Integer>of(this, "quantity"), QUANTITIES));
         order.add(new DropDownChoice<>("slot", PropertyModel.<String>of(this, "slot"), List.<String>of()));
+        order.add(new DropDownChoice<>("reorder", PropertyModel.<Order>of(this, "reorder"), Order.ALL));
 
         var archived = new WebMarkupContainer("archived");
         archived.setEnabled(false);

@@ -69,7 +69,8 @@
 /// - R2.9 — Where `withLabel` is given, the locator shall match only components whose label
 ///   equals the given text.
 /// - R2.10 — The locator shall compare a label with the given text ignoring leading and
-///   trailing whitespace in both, and treating every run of whitespace as one space.
+///   trailing whitespace in both, and treating every run of whitespace, non-breaking spaces
+///   included, as one space.
 ///   _(why: Wicket takes a label from the markup as it is written, line breaks and indentation
 ///   included)_
 /// - R2.11 — If reading a component's label throws, then the locator shall treat the component
@@ -78,10 +79,14 @@
 ///   only components whose model object is of that type and accepted by the predicate.
 ///   _(why: entities that are loaded again for every request often equal only themselves, as
 ///   for rows in R3.4)_
-/// - R2.13 — The locator shall read a label as text: without its markup tags, and with its
-///   character entities decoded.
+/// - R2.13 — The locator shall match a label as it is written, and also as text: without its
+///   markup tags, and with its character entities decoded.
 ///   _(why: Wicket takes a `<wicket:label>`'s body as markup, such as
-///   `Terms &amp; <b>conditions</b>` for "Terms & conditions")_
+///   `Terms &amp; <b>conditions</b>` for "Terms & conditions", while a label from `setLabel`
+///   is plain text, such as "Age < 18 or > 65")_
+/// - R2.14 — Where `withModelObject` or `inRowOf` is given a primitive type, the locator shall
+///   use its wrapper type instead, `Integer` for `int`.
+///   _(why: a model object is never of a primitive type, so `int.class` would match nothing)_
 ///
 /// ### R3: Refine by position
 /// - R3.1 — Where `inside` is given, the locator shall match only components with an ancestor
@@ -178,7 +183,7 @@
 ///   `  - and <k> more`. Each line shall say what differs for every criterion the component
 ///   misses, in the order of the table below, leaving out the criteria that R4.4 keeps the
 ///   locator from evaluating. It shall order the components by how many criteria they miss,
-///   fewest first, and in tree order within each.
+///   those it didn't evaluate included, fewest first, and in tree order within each.
 ///   _(why: after a refactoring a component often misses two criteria at once, such as a
 ///   renamed id in a row that moved, and a message that only says "found none" leaves the
 ///   reader to search the page)_

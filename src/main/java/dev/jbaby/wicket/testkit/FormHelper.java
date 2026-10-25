@@ -1,6 +1,5 @@
 package dev.jbaby.wicket.testkit;
 
-import static dev.jbaby.wicket.testkit.WicketTestkit.className;
 import static dev.jbaby.wicket.testkit.WicketTestkit.delegate;
 import static dev.jbaby.wicket.testkit.WicketTestkit.notNull;
 import static dev.jbaby.wicket.testkit.WicketTestkit.prefix;
@@ -10,8 +9,10 @@ import static dev.jbaby.wicket.testkit.WicketTestkit.requireVisible;
 import static java.util.stream.Collectors.joining;
 
 import dev.jbaby.wicket.testkit.locator.Locator;
+import dev.jbaby.wicket.testkit.locator.Words;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.apache.wicket.Component;
 import org.apache.wicket.markup.html.form.AbstractChoice;
@@ -70,9 +71,10 @@ public final class FormHelper {
     /// @throws AssertionError also if the field is not enabled in hierarchy
     public FormHelper set(@SuppressWarnings("rawtypes") Locator<? extends FormComponent> field,
             String value) {
-        requireCurrent();
+        notNull(field, "field");
         notNull(value, "value");
-        var located = locateUsable(notNull(field, "field"));
+        requireCurrent();
+        var located = locateUsable(field);
         delegate(field, located, () -> formTester.setValue(located, value));
         return this;
     }
@@ -94,8 +96,9 @@ public final class FormHelper {
     ///     `FormComponentUpdatingBehavior`
     public FormHelper select(@SuppressWarnings("rawtypes") Locator<? extends FormComponent> field,
             int index) {
+        notNull(field, "field");
         requireCurrent();
-        var located = locateUsable(notNull(field, "field"));
+        var located = locateUsable(field);
         requireNoUpdatingBehavior(field, located);
         delegate(field, located, () -> formTester.select(formRelativePath(located), index));
         return this;
@@ -118,9 +121,10 @@ public final class FormHelper {
     ///     it has
     public FormHelper choose(@SuppressWarnings("rawtypes") Locator<? extends AbstractChoice> field,
             Object choice) {
-        requireCurrent();
+        notNull(field, "field");
         notNull(choice, "choice");
-        var located = (AbstractChoice<?, ?>) locateUsable(notNull(field, "field"));
+        requireCurrent();
+        var located = (AbstractChoice<?, ?>) locateUsable(field);
         requireNoUpdatingBehavior(field, located);
         var index = indexOf(field, located, located.getChoices(), choice);
         delegate(field, located, () -> formTester.select(formRelativePath(located), index));
@@ -143,9 +147,10 @@ public final class FormHelper {
     ///     choices it has
     public FormHelper chooseAll(@SuppressWarnings("rawtypes") Locator<? extends ListMultipleChoice> field,
             Object... choices) {
-        requireCurrent();
+        notNull(field, "field");
         Stream.of(notNull(choices, "choices")).forEach(choice -> notNull(choice, "choices"));
-        var located = (ListMultipleChoice<?>) locateUsable(notNull(field, "field"));
+        requireCurrent();
+        var located = (ListMultipleChoice<?>) locateUsable(field);
         var available = located.getChoices();
         var indexes = Stream.of(choices).mapToInt(choice -> indexOf(field, located, available, choice)).toArray();
         delegate(field, located,
@@ -180,8 +185,9 @@ public final class FormHelper {
     }
 
     private FormHelper setChecked(Locator<? extends CheckBox> field, boolean checked) {
+        notNull(field, "field");
         requireCurrent();
-        var located = locateUsable(notNull(field, "field"));
+        var located = locateUsable(field);
         delegate(field, located, () -> formTester.setValue(located, Boolean.toString(checked)));
         return this;
     }
@@ -200,9 +206,10 @@ public final class FormHelper {
     /// @param event the event, such as `change` or `blur`
     /// @throws AssertionError also if the component has no Ajax behavior for the event
     public void ajax(Locator<?> component, String event) {
-        requireCurrent();
+        notNull(component, "component");
         notNull(event, "event");
-        var located = requireVisible(component, notNull(component, "component").one(form));
+        requireCurrent();
+        var located = requireVisible(component, component.one(form));
         requireAjaxBehavior(component, located, event);
         delegate(component, located, () -> tester.executeAjaxEvent(located, event));
     }
@@ -229,8 +236,9 @@ public final class FormHelper {
     /// @param button the locator of the button, inside this form
     /// @throws AssertionError also if the button is not enabled in hierarchy
     public void submit(Locator<?> button) {
+        notNull(button, "button");
         requireCurrent();
-        var located = locateUsable(notNull(button, "button"));
+        var located = locateUsable(button);
         delegate(button, located, () -> formTester.submit(located));
     }
 
@@ -276,13 +284,28 @@ public final class FormHelper {
                 return index;
             }
         }
-        var types = choices.stream().filter(Objects::nonNull).map(each -> className(each.getClass())).distinct()
-            .toList();
-        var type = className(choice.getClass());
-        var choicesAre = choices.isEmpty() || types.contains(type) ? "; its choices are "
-            : " of type " + type + "; its choices, of type " + String.join(", ", types) + ", are ";
-        throw new AssertionError(prefix(field, located) + "the component has no choice " + WicketTestkit.shown(choice)
-            + choicesAre + listed(choices));
+        throw new AssertionError(prefix(field, located) + "the component has no choice " + Words.value(choice)
+            + typesIfDifferent(choice, choices) + listed(choices));
+    }
+
+    /// `; its choices are `, or with the classes in between if none of the choices is of the
+    /// choice's class: by their simple names, or by their full names if two simple names are alike.
+    private static String typesIfDifferent(Object choice, List<?> choices) {
+        var type = Words.namedClass(choice.getClass());
+        var types = choices.stream().filter(Objects::nonNull).map(each -> Words.namedClass(each.getClass()))
+            .distinct().toList();
+        if (types.isEmpty() || types.contains(type)) {
+            return "; its choices are ";
+        }
+        var all = Stream.concat(Stream.of(type), types.stream()).toList();
+        Function<Class<?>, String> name = all.stream().map(Class::getSimpleName).distinct().count() < all.size()
+            ? FormHelper::fullName : Class::getSimpleName;
+        return " of type " + name.apply(type) + "; its choices, of type "
+            + types.stream().map(name).collect(joining(", ")) + ", are ";
+    }
+
+    private static String fullName(Class<?> type) {
+        return type.getCanonicalName() != null ? type.getCanonicalName() : type.getName();
     }
 
     /// The choices separated by commas, at most `MAX_CHOICES` of them, or `none`.
@@ -290,7 +313,7 @@ public final class FormHelper {
         if (choices.isEmpty()) {
             return "none";
         }
-        var shown = choices.stream().limit(MAX_CHOICES).map(WicketTestkit::shown).collect(joining(", "));
+        var shown = choices.stream().limit(MAX_CHOICES).map(Words::value).collect(joining(", "));
         return choices.size() > MAX_CHOICES ? shown + ", and " + (choices.size() - MAX_CHOICES) + " more" : shown;
     }
 

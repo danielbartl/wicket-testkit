@@ -19,8 +19,9 @@ final class FailureMessage {
     record NearMiss(Component component, String whatDiffers, int order) {
     }
 
-    /// A component of a locator's type that misses several criteria, and what differs for each.
-    record Candidate(Component component, List<String> whatDiffers) {
+    /// A component of a locator's type that misses several criteria, what differs for each it was
+    /// tested for, and how many it misses, untested ones included.
+    record Candidate(Component component, List<String> whatDiffers, int misses) {
     }
 
     /// The candidates are shown only if nothing matches and there is no near miss.

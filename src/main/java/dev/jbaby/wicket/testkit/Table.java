@@ -2,6 +2,7 @@ package dev.jbaby.wicket.testkit;
 
 import static java.util.stream.Collectors.joining;
 
+import dev.jbaby.wicket.testkit.locator.Words;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -11,8 +12,6 @@ import java.util.stream.Stream;
 /// A table of cell texts, as [WicketTestkit#assertRows] compares a repeater's rows with: a header
 /// of `wicket:id`s and a row of cell texts per repeater row.
 record Table(List<String> header, List<List<String>> rows) {
-
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     /// A `|` that isn't written as `\|`.
     private static final Pattern SEPARATOR = Pattern.compile("(?<!\\\\)\\|");
@@ -55,15 +54,10 @@ record Table(List<String> header, List<List<String>> rows) {
             throw new IllegalArgumentException("line " + number + " of the table doesn't start and end with |");
         }
         return Stream.of(SEPARATOR.split(line.substring(1, line.length() - 1), -1))
-            .map(cell -> cellText(cell.replace("\\|", "|")))
+            .map(cell -> Words.normalized(cell.replace("\\|", "|")))
             .toList();
     }
 
-    /// The text without whitespace at either end, and every run of whitespace as one space, as a
-    /// browser shows it.
-    static String cellText(String text) {
-        return WHITESPACE.matcher(text.strip()).replaceAll(" ");
-    }
 
     /// The width of every column: its widest cell, header included and `|` written as `\|`, in
     /// any of the tables, which have the same header.

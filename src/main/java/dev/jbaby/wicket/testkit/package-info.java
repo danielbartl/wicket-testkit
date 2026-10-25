@@ -43,9 +43,10 @@
 ///   `| ACME | open |`. The first row, the header, holds `wicket:id`s; every other row the cell
 ///   texts of one row of a repeater. `\|` stands for a `|` inside a cell.
 /// - **cell text**: for a table, a cell's content; for a repeater's row, the model object of the
-///   row's component with the column's `wicket:id`, as `Component.getDefaultModelObjectAsString`
-///   gives it, which is what `WicketTester.assertLabel` compares. Either way without whitespace
-///   at either end, and with every run of whitespace as one space, as a browser shows it.
+///   row's component with the column's `wicket:id`, converted to text by the component's
+///   converter, as Wicket renders it but without escaping markup. Either way without whitespace
+///   at either end, and with every run of whitespace, non-breaking spaces included, as one space,
+///   as a browser shows it.
 /// - **row**, for `assertRows`: a direct child of the located repeater, such as a `ListItem` of
 ///   a `ListView` or a child of a `RepeatingView`.
 ///
@@ -146,6 +147,8 @@
 ///   of R4.15 shall name the classes:
 ///   `the component has no choice <value> of type <class name>; its choices, of type <class names>, are <choices>`.
 ///   _(why: `12L` and `12` look alike, though a `Long` never equals an `Integer`)_
+/// - R4.21 — Where classes in the message of R4.20 have the same simple name, the form helper
+///   shall name them by their full names.
 ///
 /// ### R5: Assert about one component
 /// - R5.1 — When `assertLabel` is called, the testkit shall check the located label's text as
@@ -234,11 +237,21 @@
 /// - R9.5 — If a row has no component with a column's id, or several, then `assertRows` shall
 ///   throw an `AssertionError` whose message is the prefix followed by
 ///   `row <n> (at <path>) has no component with id "<id>"` or
-///   `row <n> (at <path>) has <k> components with id "<id>"`, counting rows from 1.
+///   `row <n> (at <path>) has <k> components with id "<id>"`, counting the compared rows from 1.
 /// - R9.6 — If the table has no header, a line that doesn't start and end with `|`, a blank id,
 ///   or a row with another number of cells than the header, then `assertRows` shall throw an
 ///   `IllegalArgumentException` whose message names the line, counting the table's lines from 1.
 ///   _(why: a malformed table is a mistake in the test, not a failed assertion)_
+/// - R9.7 — The testkit shall leave out the rows that are not visible in hierarchy.
+///   _(why: the table shows what a user sees)_
+/// - R9.8 — The testkit shall compare cell texts without escaping markup.
+///   _(why: a table then says `O'Brien & Sons`, as a user reads it, not `O&#039;Brien &amp; Sons`)_
+/// - R9.9 — If reading the model object of a row's component for a column throws, or converting
+///   it to text, then `assertRows` shall throw an `AssertionError` whose message is the prefix
+///   followed by `row <n> (at <path>) has a component with id "<id>" whose model object cannot be read`,
+///   with that exception as its cause.
+///   _(why: a component without a model of its own in a `PropertyListView` row gets one for a
+///   property that may not exist)_
 ///
 /// A table and the message when one row differs:
 ///

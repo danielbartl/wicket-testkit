@@ -205,6 +205,21 @@ class FailureMessageTests {
     }
 
     @Test
+    @DisplayName("R7.7 components the locator didn't evaluate every criterion for count those as missed when ordered")
+    void untestedCriteriaCountWhenOrdering() {
+        var root = new WebMarkupContainer("root");
+        for (var number = 0; number < 5; number++) {
+            root.add(new Label("number" + number, String.valueOf(number)));
+        }
+        root.add(new Label("customer", "Globex"));
+
+        assertThat(messageOf(locate(Label.class).withId("customer").withModelObject("ACME")
+            .matching(label -> true, "is shown"), root))
+            .as("customer misses its model object only, the numbers their id and then the rest")
+            .contains("\nComponents of type Label:\n  - customer (has model object \"Globex\")\n  - number0 (has id ");
+    }
+
+    @Test
     @DisplayName("R7.8 no near misses and nothing of the locator's type: the message says so")
     void aMissingTypeIsNamed() {
         var closed = (MarkupContainer) page.get("closed");

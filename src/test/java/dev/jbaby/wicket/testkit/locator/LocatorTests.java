@@ -178,6 +178,12 @@ class LocatorTests {
             assertThat(paths(locate(TextField.class).withLabel(" Search\t term\n").all(formPage)))
                 .containsExactly("search:query");
             assertThat(locate(TextField.class).withLabel("Searchterm").all(formPage)).isEmpty();
+
+            var root = new WebMarkupContainer("root");
+            root.add(new TextField<String>("first").setLabel(Model.of("First\u00A0name")));
+            assertThat(paths(locate(TextField.class).withLabel("First name").all(root)))
+                .as("a non-breaking space")
+                .containsExactly("first");
         }
 
         @Test
@@ -189,6 +195,25 @@ class LocatorTests {
             assertThat(paths(locate(CheckBox.class).withLabel("Terms & conditions").all(formPage)))
                 .as("<wicket:label>Terms &amp; <b>conditions</b></wicket:label>")
                 .containsExactly("search:terms");
+
+            var root = new WebMarkupContainer("root");
+            root.add(new TextField<String>("age").setLabel(Model.of("Age < 18 or > 65")));
+            assertThat(paths(locate(TextField.class).withLabel("Age < 18 or > 65").all(root)))
+                .as("a plain-text label, as it is written")
+                .containsExactly("age");
+        }
+
+        @Test
+        @DisplayName("R2.14 a primitive type given to withModelObject or inRowOf stands for its wrapper type")
+        void primitiveTypesStandForTheirWrappers() {
+            var aboveFortyOne = locate(Label.class).withModelObject(int.class, number -> number > 41, "is above 41");
+            var root = new WebMarkupContainer("root");
+            root.add(new ListItem<>(0, Model.of(7)).add(new Label("seven", "7")));
+
+            assertThat(paths(aboveFortyOne.all(page))).containsExactly("orders:1:number", "orders:2:number");
+            assertThat(aboveFortyOne).hasToString("a Label whose model object is an Integer that is above 41");
+            assertThat(paths(locate(Label.class).inRowOf(int.class, number -> number == 7, "is 7").all(root)))
+                .containsExactly("0:seven");
         }
 
         @Test

@@ -247,6 +247,19 @@ class FormHelperTests {
     }
 
     @Test
+    @DisplayName("R4.21 classes with the same simple name appear by their full names")
+    void classesWithTheSameSimpleNameAppearByTheirFullNames() {
+        assertThatThrownBy(() -> kit.form(order).choose(locate(DropDownChoice.class).withId("reorder"), new Order(41)))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessageContaining(" of type dev.jbaby.wicket.testkit.FormHelperTests.Order; its choices, of type "
+                + "dev.jbaby.wicket.testkit.fixtures.Order, are ");
+    }
+
+    /// An order of another package, with the same simple name as the fixtures' `Order`.
+    record Order(int id) implements java.io.Serializable {
+    }
+
+    @Test
     @DisplayName("R4.16 chooseAll replaces the selection with exactly the given choices")
     void chooseAllReplacesTheSelection() {
         kit.form(order).chooseAll(extras, "signature", "insurance").submit();
@@ -343,6 +356,7 @@ class FormHelperTests {
                 .withMessageContaining("field"),
             () -> assertThatNullPointerException().isThrownBy(() -> form.uncheck(null))
                 .withMessageContaining("field"),
+
             () -> assertThatNullPointerException().isThrownBy(() -> form.submit(null))
                 .withMessageContaining("button"),
             () -> assertThatNullPointerException().isThrownBy(() -> form.ajax(null, "change"))
@@ -379,6 +393,29 @@ class FormHelperTests {
             () -> assertInvisible(() -> kit.form(order).uncheck(locate(CheckBox.class).withId("fragile"))),
             () -> assertInvisible(() -> kit.form(order).submit(locate(Button.class).withId("apply"))),
             () -> assertInvisible(() -> kit.form(order).ajax(locate(DropDownChoice.class).withId("gift"), "change")));
+    }
+
+    @Test
+    @DisplayName("R1.4 a null argument to a form helper of an earlier request throws a NullPointerException too")
+    void nullArgumentsAreRejectedBeforeTheRequestIsChecked() {
+        var stale = kit.form(order);
+        stale.submit();
+
+        assertAll(
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.choose(country, null))
+                .withMessageContaining("choice"),
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.chooseAll(extras, (Object[]) null))
+                .withMessageContaining("choices"),
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.set(customer, null))
+                .withMessageContaining("value"),
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.select(null, 1))
+                .withMessageContaining("field"),
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.check(null))
+                .withMessageContaining("field"),
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.ajax(country, null))
+                .withMessageContaining("event"),
+            () -> assertThatNullPointerException().isThrownBy(() -> stale.submit(null))
+                .withMessageContaining("button"));
     }
 
     static void assertInvisible(ThrowingCallable call) {

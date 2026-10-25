@@ -2,12 +2,10 @@ package dev.jbaby.wicket.testkit.locator;
 
 import java.util.Objects;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.markup.html.form.ILabelProvider;
 import org.apache.wicket.markup.html.list.ListItem;
-import org.apache.wicket.util.string.Strings;
 
 /// One refinement of a locator: a condition a component has to meet besides the locator's type.
 sealed interface Criterion {
@@ -304,20 +302,22 @@ sealed interface Criterion {
     /// The searched text is the given one, normalized once.
     record LabelText(String text, String searched) implements Criterion {
 
-        private static final Pattern WHITESPACE = Pattern.compile("\\s+");
-        private static final Pattern TAG = Pattern.compile("<[^>]*>");
-
         /// Stands for a label that could not be read.
-        private static final Object UNREADABLE = new Object();
+        private static final Label UNREADABLE = new Label("", "");
+
+        /// A label as it is written and as text, both with their whitespace normalized.
+        private record Label(String written, String asText) {
+        }
 
         static LabelText of(String text) {
-            return new LabelText(text, normalized(text));
+            return new LabelText(text, Words.normalized(text));
         }
 
         @Override
         public boolean test(Component component) {
             var actual = read(component);
-            return actual != UNREADABLE && searched.equals(actual);
+            return actual != null && actual != UNREADABLE
+                && (searched.equals(actual.written()) || searched.equals(actual.asText()));
         }
 
         @Override
@@ -329,28 +329,25 @@ sealed interface Criterion {
         public String whatDiffers(Component component) {
             var actual = read(component);
             return actual == UNREADABLE ? "has a label that cannot be read"
-                : actual == null ? "has no label" : "has label " + Words.value(actual);
+                : actual == null ? "has no label" : "has label " + Words.value(actual.written());
         }
 
-        /// The component's label as text, without tags, with entities decoded and with its whitespace
-        /// normalized; `null` if it has none, or `UNREADABLE` if reading it throws.
-        private static Object read(Component component) {
+        /// The component's label, `null` if it has none, or `UNREADABLE` if reading it throws.
+        private static Label read(Component component) {
             if (!(component instanceof ILabelProvider<?> provider)) {
                 return null;
             }
             try {
                 var label = provider.getLabel();
                 var object = label == null ? null : label.getObject();
-                return object == null ? null
-                    : normalized(Strings.unescapeMarkup(TAG.matcher(String.valueOf(object)).replaceAll("")).toString());
+                if (object == null) {
+                    return null;
+                }
+                var written = String.valueOf(object);
+                return new Label(Words.normalized(written), Words.normalized(Words.textOf(written)));
             } catch (RuntimeException e) {
                 return UNREADABLE;
             }
-        }
-
-        /// The text without whitespace at either end, and every run of whitespace as one space.
-        private static String normalized(String text) {
-            return WHITESPACE.matcher(text.strip()).replaceAll(" ");
         }
 
         @Override

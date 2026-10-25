@@ -1,8 +1,10 @@
 package dev.jbaby.wicket.testkit;
 
 import dev.jbaby.wicket.testkit.locator.Locator;
+import dev.jbaby.wicket.testkit.locator.Words;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
 import org.apache.wicket.markup.repeater.AbstractRepeater;
+import org.apache.wicket.util.convert.IConverter;
 import org.apache.wicket.util.tester.WicketTester;
 import org.apache.wicket.util.tester.WicketTesterHelper;
 import org.opentest4j.AssertionFailedError;
@@ -263,7 +266,7 @@ public final class WicketTestkit {
             return;
         }
         var message = new StringBuilder("Expected ").append(expected).append(expected == 1 ? " match" : " matches")
-            .append(" for ").append(locator).append(" in ").append(className(page.getClass()))
+            .append(" for ").append(locator).append(" in ").append(Words.className(page.getClass()))
             .append(", but found ");
         if (matches.isEmpty()) {
             message.append("none.");
@@ -289,8 +292,9 @@ public final class WicketTestkit {
     ///     """);
     /// ```
     ///
-    /// A cell's text is what `assertLabel` compares, the component's model object as a string,
-    /// with whitespace as a browser shows it; a component that isn't visible counts as empty. A
+    /// A cell's text is the component's model object as Wicket renders it, but without escaping
+    /// markup, so `O'Brien & Sons` is written as it reads, and with whitespace as a browser shows
+    /// it. A component that isn't visible counts as empty, and a row that isn't is left out. A
     /// `|` inside a cell is written `\|`, which is `\\|` in a Java text block. When the rows differ,
     /// the failure is an `AssertionFailedError` with both tables as its expected and actual values,
     /// so IDEs show them side by side.
@@ -340,27 +344,61 @@ public final class WicketTestkit {
     }
 
     /// The repeater's rows as a table, with the cell texts of the components with the ids.
+    /// The visible rows, with the cell texts of their components with the ids.
     private static Table rowsOf(Locator<?> repeater, AbstractRepeater located, List<String> ids) {
         var rows = new ArrayList<List<String>>();
         for (var row : located) {
-            var number = rows.size() + 1;
-            rows.add(ids.stream().map(id -> cellText(repeater, located, row, number, id)).toList());
+            if (row.isVisibleInHierarchy()) {
+                var where = prefix(repeater, located) + "row " + (rows.size() + 1) + " (at " + row.getPageRelativePath()
+                    + ") has ";
+                var byId = componentsById(row, ids);
+                rows.add(ids.stream().map(id -> cellText(where, id, byId.getOrDefault(id, List.of()))).toList());
+            }
         }
         return new Table(ids, rows);
     }
 
-    /// The cell text of the row's one component with the id, empty if it isn't visible.
-    private static String cellText(Locator<?> repeater, AbstractRepeater located, Component row, int number,
-            String id) {
-        var matches = row instanceof MarkupContainer container
-            ? Locator.locate(Component.class).withId(id).all(container) : List.<Component>of();
+    /// The row's descendants with any of the ids, by id, found in one walk.
+    private static Map<String, List<Component>> componentsById(Component row, List<String> ids) {
+        var byId = new HashMap<String, List<Component>>();
+        if (row instanceof MarkupContainer container) {
+            container.visitChildren((component, visit) -> {
+                if (ids.contains(component.getId())) {
+                    byId.computeIfAbsent(component.getId(), id -> new ArrayList<>()).add(component);
+                }
+            });
+        }
+        return byId;
+    }
+
+    /// The cell text of the one component with the id, empty if it isn't visible.
+    private static String cellText(String where, String id, List<Component> matches) {
         if (matches.size() != 1) {
-            throw new AssertionError(prefix(repeater, located) + "row " + number + " (at " + row.getPageRelativePath()
-                + ") has " + (matches.isEmpty() ? "no component" : matches.size() + " components")
+            throw new AssertionError(where + (matches.isEmpty() ? "no component" : matches.size() + " components")
                 + " with id \"" + id + "\"");
         }
         var component = matches.get(0);
-        return component.isVisibleInHierarchy() ? Table.cellText(component.getDefaultModelObjectAsString()) : "";
+        if (!component.isVisibleInHierarchy()) {
+            return "";
+        }
+        try {
+            return Words.normalized(text(component));
+        } catch (RuntimeException e) {
+            throw new AssertionError(where + "a component with id \"" + id + "\" whose model object cannot be read", e);
+        }
+    }
+
+    /// The component's model object converted to text by its converter, as Wicket renders it, but
+    /// without escaping markup.
+    private static String text(Component component) {
+        var object = component.getDefaultModelObject();
+        if (object == null) {
+            return "";
+        }
+        @SuppressWarnings("unchecked") // the converter is for the object's own class
+        var converter = (IConverter<Object>) component.getConverter(object.getClass());
+        var text = converter.convertToString(object, component.getLocale());
+        return text == null ? "" : text;
     }
 
     /// The page the tester rendered last.
@@ -434,31 +472,6 @@ public final class WicketTestkit {
     /// The locator's description and the component's path, to start a failure message with.
     static String prefix(Locator<?> locator, Component component) {
         return locator + " (at " + component.getPageRelativePath() + "): ";
-    }
-
-    /// The simple name of the class, or of its nearest named superclass if it is anonymous, as
-    /// the locator's messages name classes.
-    static String className(Class<?> type) {
-        var named = type;
-        while (named.isAnonymousClass()) {
-            named = named.getSuperclass();
-        }
-        return named.getSimpleName();
-    }
-
-    /// A string in double quotes, any other value as `String.valueOf` shows it, or by its class if
-    /// its `toString` throws: as a locator's description shows values, which this package can't
-    /// reach.
-    static String shown(Object value) {
-        if (value instanceof String) {
-            return "\"" + value + "\"";
-        }
-        try {
-            return String.valueOf(value);
-        } catch (RuntimeException e) {
-            var name = className(value.getClass());
-            return ("AEIOUaeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name + " whose toString throws";
-        }
     }
 
     static <V> V notNull(V value, String parameter) {
