@@ -20,8 +20,16 @@ final class Words {
         return named.getSimpleName();
     }
 
-    /// A string in double quotes, any other value as `String.valueOf` shows it.
+    /// A string in double quotes, any other value as `String.valueOf` shows it, or by its class if
+    /// its `toString` throws.
     static String value(Object value) {
-        return value instanceof String ? "\"" + value + "\"" : String.valueOf(value);
+        if (value instanceof String) {
+            return "\"" + value + "\"";
+        }
+        try {
+            return String.valueOf(value);
+        } catch (RuntimeException e) {
+            return withArticle(className(value.getClass())) + " whose toString throws";
+        }
     }
 }

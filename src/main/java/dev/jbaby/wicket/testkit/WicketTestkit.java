@@ -2,16 +2,20 @@ package dev.jbaby.wicket.testkit;
 
 import dev.jbaby.wicket.testkit.locator.Locator;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.apache.wicket.Component;
+import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.Page;
 import org.apache.wicket.feedback.ComponentFeedbackMessageFilter;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.panel.FeedbackPanel;
+import org.apache.wicket.markup.repeater.AbstractRepeater;
 import org.apache.wicket.util.tester.WicketTester;
 import org.apache.wicket.util.tester.WicketTesterHelper;
 import org.opentest4j.AssertionFailedError;
@@ -70,7 +74,7 @@ public final class WicketTestkit {
     /// @param link the locator of the link
     public void click(Locator<?> link) {
         var component = locateVisible(notNull(link, "link"));
-        check(link, component, () -> tester.clickLink(component));
+        delegate(link, component, () -> tester.clickLink(component));
     }
 
     /// Fires an Ajax event on a component, as `WicketTester.executeAjaxEvent` does.
@@ -90,7 +94,7 @@ public final class WicketTestkit {
         notNull(event, "event");
         var located = locateVisible(notNull(component, "component"));
         requireAjaxBehavior(component, located, event);
-        check(component, located, () -> tester.executeAjaxEvent(located, event));
+        delegate(component, located, () -> tester.executeAjaxEvent(located, event));
     }
 
     /// Starts filling in a form, from its current values, as `WicketTester.newFormTester` does.
@@ -110,7 +114,7 @@ public final class WicketTestkit {
         if (current != null && current.isCurrent()) {
             return current;
         }
-        var formTester = checked(form, located, () -> tester.newFormTester(located.getPageRelativePath()));
+        var formTester = delegateAndGet(form, located, () -> tester.newFormTester(located.getPageRelativePath()));
         var helper = new FormHelper(tester, form, located, formTester);
         formHelpers.put(located, helper);
         return helper;
@@ -127,7 +131,7 @@ public final class WicketTestkit {
     public void assertLabel(Locator<? extends Label> label, String expectedText) {
         notNull(expectedText, "expectedText");
         var component = locateVisible(notNull(label, "label"));
-        check(label, component, () -> tester.assertLabel(component.getPageRelativePath(), expectedText));
+        delegate(label, component, () -> tester.assertLabel(component.getPageRelativePath(), expectedText));
     }
 
     /// Asserts that a component is visible in hierarchy, as `WicketTester.assertVisible` does.
@@ -139,7 +143,7 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     public void assertVisible(Locator<?> component) {
         var located = locate(notNull(component, "component"));
-        check(component, located, () -> tester.assertVisible(located.getPageRelativePath()));
+        delegate(component, located, () -> tester.assertVisible(located.getPageRelativePath()));
     }
 
     /// Asserts that a component is not visible in hierarchy, as `WicketTester.assertInvisible`
@@ -153,7 +157,7 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     public void assertInvisible(Locator<?> component) {
         var located = locate(notNull(component, "component"));
-        check(component, located, () -> tester.assertInvisible(located.getPageRelativePath()));
+        delegate(component, located, () -> tester.assertInvisible(located.getPageRelativePath()));
     }
 
     /// Asserts that a component is enabled in hierarchy, as `WicketTester.assertEnabled` does.
@@ -165,7 +169,7 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     public void assertEnabled(Locator<?> component) {
         var located = locateVisible(notNull(component, "component"));
-        check(component, located, () -> tester.assertEnabled(located.getPageRelativePath()));
+        delegate(component, located, () -> tester.assertEnabled(located.getPageRelativePath()));
     }
 
     /// Asserts that a component is not enabled in hierarchy, as `WicketTester.assertDisabled`
@@ -178,7 +182,7 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     public void assertDisabled(Locator<?> component) {
         var located = locateVisible(notNull(component, "component"));
-        check(component, located, () -> tester.assertDisabled(located.getPageRelativePath()));
+        delegate(component, located, () -> tester.assertDisabled(located.getPageRelativePath()));
     }
 
     /// Asserts a component's model object, as `WicketTester.assertModelValue` does.
@@ -192,7 +196,7 @@ public final class WicketTestkit {
     ///     that it has none
     public void assertModelObject(Locator<?> component, Object expected) {
         var located = locateVisible(notNull(component, "component"));
-        check(component, located, () -> tester.assertModelValue(located.getPageRelativePath(), expected));
+        delegate(component, located, () -> tester.assertModelValue(located.getPageRelativePath(), expected));
     }
 
     /// Asserts the messages a feedback panel shows, as `WicketTester.assertFeedback` does.
@@ -207,7 +211,7 @@ public final class WicketTestkit {
             Serializable... expectedMessages) {
         notNull(expectedMessages, "expectedMessages");
         var located = locateVisible(notNull(panel, "panel"));
-        check(panel, located, () -> tester.assertFeedback(located.getPageRelativePath(), expectedMessages));
+        delegate(panel, located, () -> tester.assertFeedback(located.getPageRelativePath(), expectedMessages));
     }
 
     /// Asserts the feedback messages of one component, such as a form field, as
@@ -224,7 +228,7 @@ public final class WicketTestkit {
     public void assertFeedbackOn(Locator<?> component, Serializable... expectedMessages) {
         notNull(expectedMessages, "expectedMessages");
         var located = locate(notNull(component, "component"));
-        check(component, located,
+        delegate(component, located,
             () -> tester.assertFeedbackMessages(new ComponentFeedbackMessageFilter(located), expectedMessages));
     }
 
@@ -239,7 +243,7 @@ public final class WicketTestkit {
     /// @param component the locator of the component
     public void assertOnAjaxResponse(Locator<?> component) {
         var located = locate(notNull(component, "component"));
-        check(component, located, () -> tester.assertComponentOnAjaxResponse(located));
+        delegate(component, located, () -> tester.assertComponentOnAjaxResponse(located));
     }
 
     /// Asserts how many components a locator matches on the last rendered page.
@@ -274,6 +278,40 @@ public final class WicketTestkit {
         throw new AssertionError(message.toString());
     }
 
+    /// Compares a repeater's rows with an example table. The header names the `wicket:id`s to
+    /// read in every row, and each further line the texts one row should show, in the rows' order.
+    ///
+    /// ```java
+    /// kit.assertRows(locate(ListView.class).withId("orders"), """
+    ///     | customer | status  |
+    ///     | ACME     | open    |
+    ///     | Globex   | shipped |
+    ///     """);
+    /// ```
+    ///
+    /// A cell's text is what `assertLabel` compares, the component's model object as a string,
+    /// with whitespace as a browser shows it; a component that isn't visible counts as empty. A
+    /// `|` inside a cell is written `\|`, which is `\\|` in a Java text block. When the rows differ,
+    /// the failure is an `AssertionFailedError` with both tables as its expected and actual values,
+    /// so IDEs show them side by side.
+    ///
+    /// @param repeater the locator of the repeater, such as a `ListView` or a `DataView`
+    /// @param expectedTable the table: a header of `wicket:id`s, then a line per row
+    /// @throws AssertionError also if a row has no component with one of the ids, or several
+    /// @throws IllegalArgumentException if the table is malformed
+    public void assertRows(Locator<? extends AbstractRepeater> repeater, String expectedTable) {
+        var expected = Table.parse(notNull(expectedTable, "expectedTable"));
+        var located = (AbstractRepeater) locateVisible(notNull(repeater, "repeater"));
+        var actual = rowsOf(repeater, located, expected.header());
+        if (!actual.equals(expected)) {
+            var widths = Table.widths(expected, actual);
+            var expectedText = expected.written(widths);
+            var actualText = actual.written(widths);
+            throw new AssertionFailedError(prefix(repeater, located) + "the rows differ\nexpected:\n" + expectedText
+                + "\nbut was:\n" + actualText, expectedText, actualText);
+        }
+    }
+
     /// Returns the component a locator finds, for any check this class doesn't wrap.
     ///
     /// ```java
@@ -299,6 +337,30 @@ public final class WicketTestkit {
     /// @return the path, as `WicketTester` takes it
     public String pathOf(Locator<?> locator) {
         return locate(notNull(locator, "locator")).getPageRelativePath();
+    }
+
+    /// The repeater's rows as a table, with the cell texts of the components with the ids.
+    private static Table rowsOf(Locator<?> repeater, AbstractRepeater located, List<String> ids) {
+        var rows = new ArrayList<List<String>>();
+        for (var row : located) {
+            var number = rows.size() + 1;
+            rows.add(ids.stream().map(id -> cellText(repeater, located, row, number, id)).toList());
+        }
+        return new Table(ids, rows);
+    }
+
+    /// The cell text of the row's one component with the id, empty if it isn't visible.
+    private static String cellText(Locator<?> repeater, AbstractRepeater located, Component row, int number,
+            String id) {
+        var matches = row instanceof MarkupContainer container
+            ? Locator.locate(Component.class).withId(id).all(container) : List.<Component>of();
+        if (matches.size() != 1) {
+            throw new AssertionError(prefix(repeater, located) + "row " + number + " (at " + row.getPageRelativePath()
+                + ") has " + (matches.isEmpty() ? "no component" : matches.size() + " components")
+                + " with id \"" + id + "\"");
+        }
+        var component = matches.get(0);
+        return component.isVisibleInHierarchy() ? Table.cellText(component.getDefaultModelObjectAsString()) : "";
     }
 
     /// The page the tester rendered last.
@@ -338,18 +400,19 @@ public final class WicketTestkit {
         }
     }
 
-    /// Runs a WicketTester check for the component and puts the prefix in front of its failure.
-    static void check(Locator<?> locator, Component component, Runnable check) {
-        checked(locator, component, () -> {
+    /// Runs the WicketTester or FormTester method that does the job for the component, and puts
+    /// the prefix in front of its failure.
+    static void delegate(Locator<?> locator, Component component, Runnable check) {
+        delegateAndGet(locator, component, () -> {
             check.run();
             return null;
         });
     }
 
-    /// Like [#check(Locator, Component, Runnable)], for a check that returns a result. An
+    /// Like [#delegate(Locator, Component, Runnable)], for a method that returns a result. An
     /// `AssertionFailedError` comes back as one, with its expected and actual values, so IDEs
     /// can show their diff.
-    static <R> R checked(Locator<?> locator, Component component, Supplier<R> check) {
+    static <R> R delegateAndGet(Locator<?> locator, Component component, Supplier<R> check) {
         try {
             return check.get();
         } catch (AssertionFailedError failure) {
@@ -375,12 +438,27 @@ public final class WicketTestkit {
 
     /// The simple name of the class, or of its nearest named superclass if it is anonymous, as
     /// the locator's messages name classes.
-    private static String className(Class<?> type) {
+    static String className(Class<?> type) {
         var named = type;
         while (named.isAnonymousClass()) {
             named = named.getSuperclass();
         }
         return named.getSimpleName();
+    }
+
+    /// A string in double quotes, any other value as `String.valueOf` shows it, or by its class if
+    /// its `toString` throws: as a locator's description shows values, which this package can't
+    /// reach.
+    static String shown(Object value) {
+        if (value instanceof String) {
+            return "\"" + value + "\"";
+        }
+        try {
+            return String.valueOf(value);
+        } catch (RuntimeException e) {
+            var name = className(value.getClass());
+            return ("AEIOUaeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name + " whose toString throws";
+        }
     }
 
     static <V> V notNull(V value, String parameter) {

@@ -26,6 +26,7 @@
 ///   `assertInvisible`, `assertEnabled`, `assertDisabled`, `assertModelObject`,
 ///   `assertFeedback`, `assertFeedbackOn`, `assertOnAjaxResponse`)
 /// - `count`: assert how many components match (`WicketTestkit.assertCount`)
+/// - `assert-rows`: compare a repeater's rows with an example table (`WicketTestkit.assertRows`)
 /// - `get-path`: the page-relative path, for any WicketTester method the testkit doesn't wrap
 ///   (`WicketTestkit.pathOf`)
 /// - `get-component`: the located component, for any check the testkit doesn't wrap
@@ -38,6 +39,15 @@
 ///   located component's page-relative path.
 /// - **choice**: an element of a choice field's list of choices (`AbstractChoice.getChoices()`),
 ///   compared with `equals`.
+/// - **table**: text whose lines, blank ones aside, are rows of cells between `|` characters,
+///   `| ACME | open |`. The first row, the header, holds `wicket:id`s; every other row the cell
+///   texts of one row of a repeater. `\|` stands for a `|` inside a cell.
+/// - **cell text**: for a table, a cell's content; for a repeater's row, the model object of the
+///   row's component with the column's `wicket:id`, as `Component.getDefaultModelObjectAsString`
+///   gives it, which is what `WicketTester.assertLabel` compares. Either way without whitespace
+///   at either end, and with every run of whitespace as one space, as a browser shows it.
+/// - **row**, for `assertRows`: a direct child of the located repeater, such as a `ListItem` of
+///   a `ListView` or a child of a `RepeatingView`.
 ///
 /// Description, path, root and the failure messages of a locator are defined in
 /// `dev.jbaby.wicket.testkit.locator`.
@@ -132,6 +142,10 @@
 ///   `FormTester.setValue` does with `true`.
 /// - R4.19 — When `uncheck` is called, the form helper shall uncheck the located check box, as
 ///   `FormTester.setValue` does with `false`.
+/// - R4.20 — If no choice of the located field is of the given choice's class, then the message
+///   of R4.15 shall name the classes:
+///   `the component has no choice <value> of type <class name>; its choices, of type <class names>, are <choices>`.
+///   _(why: `12L` and `12` look alike, though a `Long` never equals an `Integer`)_
 ///
 /// ### R5: Assert about one component
 /// - R5.1 — When `assertLabel` is called, the testkit shall check the located label's text as
@@ -178,7 +192,7 @@
 ///   _(why: an exception from the application under test is not a failed assertion)_
 /// - R7.3 — If the located component is not visible in hierarchy, then `click`, `ajax`, `form`,
 ///   `set`, `select`, `choose`, `chooseAll`, `check`, `uncheck`, the form helper's `ajax`,
-///   `submit` with a button, `assertLabel`,
+///   `submit` with a button, `assertRows`, `assertLabel`,
 ///   `assertModelObject`, `assertEnabled`, `assertDisabled` and `assertFeedback` shall throw an
 ///   `AssertionError` whose message is the prefix followed by
 ///   `the component is not visible in hierarchy`.
@@ -201,6 +215,53 @@
 /// a Label with id "customer" in the row of Order[id=42] (at orders:0:customer): expected: <ACME> but was: <Acme Inc.>
 /// ```
 ///
+/// ### R9: Compare rows with a table
+/// - R9.1 — When `assertRows` is called with a table, the testkit shall pass if the located
+///   repeater's rows, in tree order, have exactly the table's rows of cell texts in the columns
+///   of the header's ids.
+/// - R9.2 — If the rows differ from the table, then `assertRows` shall throw an opentest4j
+///   `AssertionFailedError` whose message is the prefix followed by `the rows differ`, then the
+///   line `expected:` and the expected table, then the line `but was:` and the rows as a table,
+///   and whose expected and actual values are these two tables.
+///   _(why: IDEs then show the two tables side by side, row by row)_
+/// - R9.3 — The testkit shall write both tables as one line per row, `| <cell> | <cell> |`, the
+///   header first, with every column padded with spaces to its widest cell in either table and a
+///   `|` inside a cell written as `\|`.
+///   _(why: with equal widths, the rows that match are equal lines in the diff)_
+/// - R9.4 — Where a row's component for a column is not visible in hierarchy, the testkit shall
+///   take its cell text as empty.
+///   _(why: the table shows what a user sees)_
+/// - R9.5 — If a row has no component with a column's id, or several, then `assertRows` shall
+///   throw an `AssertionError` whose message is the prefix followed by
+///   `row <n> (at <path>) has no component with id "<id>"` or
+///   `row <n> (at <path>) has <k> components with id "<id>"`, counting rows from 1.
+/// - R9.6 — If the table has no header, a line that doesn't start and end with `|`, a blank id,
+///   or a row with another number of cells than the header, then `assertRows` shall throw an
+///   `IllegalArgumentException` whose message names the line, counting the table's lines from 1.
+///   _(why: a malformed table is a mistake in the test, not a failed assertion)_
+///
+/// A table and the message when one row differs:
+///
+/// ```java
+/// kit.assertRows(locate(ListView.class).withId("orders"), """
+///     | customer | status  |
+///     | ACME     | open    |
+///     | Globex   | shipped |
+///     """);
+/// ```
+///
+/// ```
+/// a ListView with id "orders" (at orders): the rows differ
+/// expected:
+/// | customer | status  |
+/// | ACME     | open    |
+/// | Globex   | shipped |
+/// but was:
+/// | customer | status  |
+/// | ACME     | open    |
+/// | Globex   | open    |
+/// ```
+///
 /// ## Out of scope
 /// - a root other than the last rendered page: narrow a locator with `inside` instead
 /// - the component started with `startComponentInPage` itself as the located component:
@@ -208,6 +269,8 @@
 /// - a method for every WicketTester method: pass `pathOf` to the tester instead
 /// - file uploads: use `formTester()`
 /// - choosing a choice by the text it shows: `choose` takes the choice itself
+/// - comparing a `DataTable` with a table: its cells all have the id `cell`, so a header can't
+///   name them
 /// - a base class for page objects; the README shows page objects built on locators
 /// - Spring and `@WicketTest` integration (the dev.jbaby Wicket Spring Boot starter's test
 ///   module)

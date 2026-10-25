@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import dev.jbaby.wicket.testkit.fixtures.OrderFormPage;
 import dev.jbaby.wicket.testkit.locator.Locator;
-import java.util.List;
+import java.util.Collection;
 import org.apache.wicket.ajax.markup.html.form.AjaxButton;
 import org.apache.wicket.ajax.markup.html.form.AjaxSubmitLink;
 import org.apache.wicket.markup.html.form.Button;
@@ -238,11 +238,25 @@ class FormHelperTests {
     }
 
     @Test
+    @DisplayName("R4.20 when no choice is of the given choice's class, the message names the classes")
+    void chooseNamesTheClassesOnATypeMismatch() {
+        assertThatThrownBy(() -> kit.form(order).choose(quantity, 12L))
+            .isExactlyInstanceOf(AssertionError.class)
+            .hasMessageEndingWith("): the component has no choice 12 of type Long; its choices, of type Integer, are "
+                + "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, and 2 more");
+    }
+
+    @Test
     @DisplayName("R4.16 chooseAll replaces the selection with exactly the given choices")
     void chooseAllReplacesTheSelection() {
         kit.form(order).chooseAll(extras, "signature", "insurance").submit();
 
-        tester.assertModelValue("order:extras", List.of("insurance", "signature"));
+        assertThat(selected(extras)).containsExactlyInAnyOrder("insurance", "signature");
+    }
+
+    @SuppressWarnings("unchecked")
+    Collection<Object> selected(Locator<CheckBoxMultipleChoice> field) {
+        return (Collection<Object>) kit.one(field).getModelObject();
     }
 
     @Test
@@ -250,7 +264,7 @@ class FormHelperTests {
     void chooseAllWithoutChoicesClearsTheSelection() {
         kit.form(order).chooseAll(extras).submit();
 
-        tester.assertModelValue("order:extras", List.of());
+        assertThat(selected(extras)).isEmpty();
     }
 
     @Test

@@ -17,6 +17,7 @@
 /// - `resolve-all`: every matching component (`Locator.all`)
 /// - `check-exists`: whether anything matches (`Locator.existsIn`)
 /// - `describe`: the criteria in plain words (`Locator.toString`)
+/// - `name`: give a locator a name in the domain's words (`Locator.named`)
 ///
 /// ## Terms
 /// - **criterion**: one condition of a locator. Its type is one, and every refinement adds one.
@@ -25,11 +26,9 @@
 /// - **tree order**: the order in which `MarkupContainer.visitChildren` visits the
 ///   descendants: depth first, a parent before its children, children in the order they were
 ///   added.
-/// - **row**: a direct child of a repeater (`AbstractRepeater`). `ListView` renders a `ListItem`
-///   for each element of its list, `RefreshingView` and `DataView` an `Item`, which extends
-///   `ListItem`. A `RepeatingView` holds whatever children it was given, and a `Loop` a
-///   `LoopItem` per index, which has no model unless the loop gives it one. The row's model
-///   object is its element.
+/// - **row**: a `ListItem`, which `ListView` renders for each element of its list. A
+///   `RefreshingView` or `DataView` renders an `Item`, which extends `ListItem`. The row's
+///   model object is its element.
 /// - **label**: the text of a component's label model (`ILabelProvider.getLabel()`), which form
 ///   components have. Wicket sets it from `setLabel`, or from the text of a `<wicket:label>` in
 ///   the markup when the field has no label yet; a plain `<label wicket:for>` leaves it unset.
@@ -79,6 +78,10 @@
 ///   only components whose model object is of that type and accepted by the predicate.
 ///   _(why: entities that are loaded again for every request often equal only themselves, as
 ///   for rows in R3.4)_
+/// - R2.13 — The locator shall read a label as text: without its markup tags, and with its
+///   character entities decoded.
+///   _(why: Wicket takes a `<wicket:label>`'s body as markup, such as
+///   `Terms &amp; <b>conditions</b>` for "Terms & conditions")_
 ///
 /// ### R3: Refine by position
 /// - R3.1 — Where `inside` is given, the locator shall match only components with an ancestor
@@ -92,22 +95,19 @@
 ///   only components inside a row whose model object is of that type and accepted by the
 ///   predicate.
 ///   _(why: entities that are loaded again for every request often equal only themselves)_
-/// - R3.5 — Where `inRowOf` is given, the locator shall match only components inside a row of
-///   any other repeater whose model object equals the argument, `RepeatingView` rows included.
 /// - R3.6 — If reading a row's model object throws, then the locator shall treat that row as not
 ///   matching `inRowOf`.
-///   _(why: a `RepeatingView` child without a model of its own inherits one, for example from a
-///   `CompoundPropertyModel`, and that model may throw, as in R2.7)_
+///   _(why: a row's model may load its element and fail, as in R2.7)_
 ///
 /// ### R4: Combine refinements
 /// - R4.1 — The locator shall match only components that meet all its criteria.
-/// - R4.2 — When a locator is refined, the locator shall return a new locator and leave the
-///   original unchanged.
+/// - R4.2 — When a locator is refined or named, the locator shall return a new locator and leave
+///   the original unchanged.
 ///   _(why: a page object can then keep base locators and refine them per test)_
 /// - R4.3 — If any method of a locator is given `null`, other than the model object of
 ///   `withModelObject`, then the locator shall throw a `NullPointerException` that names the
 ///   parameter.
-/// - R4.4 — The locator shall read a component's model object, and apply a `matching`
+/// - R4.4 — The locator shall read a component's model object or label, and apply a `matching`
 ///   predicate to it, only once the component has met the locator's type and all its other
 ///   criteria, whatever order the refinements were given in.
 ///   _(why: models of unrelated components may load data or fail outside their own page, and a
@@ -135,6 +135,10 @@
 /// - R6.3 — The locator shall put a string value in double quotes and show any other value as
 ///   `String.valueOf` does.
 /// - R6.4 — When `toString` is called, the locator shall return its description.
+/// - R6.5 — If a value's `toString` throws, then the locator shall show the value as
+///   `<a or an> <class name> whose toString throws`.
+///   _(why: a description, and so a failure message, must not fail itself; an entity's
+///   `toString` may need a database session)_
 ///
 /// | Refinement | Adds | Example |
 /// |---|---|---|
@@ -211,10 +215,33 @@
 ///   - orders:1:customerName (is not in the row of Order[id=99]; has id "customerName")
 /// ```
 ///
+/// ### R8: Name
+/// - R8.1 — Where `named` is given, the locator shall describe itself as `<name>, <description>`,
+///   where `<description>` is what R6 describes.
+///   _(why: failure messages then speak the domain's words and still say what was searched)_
+/// - R8.2 — Where `inside` is given a named locator, the locator shall show only that locator's
+///   name in its description and in what differs.
+///   _(why: a second description in the middle of the first one would be hard to read)_
+/// - R8.3 — When a named locator is refined, the locator shall return a locator without the
+///   name.
+///   _(why: the name says what the named locator matches, and a refinement changes that)_
+/// - R8.4 — The locator shall match the same components whether it is named or not.
+/// - R8.5 — If `named` is given a blank name, then the locator shall throw an
+///   `IllegalArgumentException`.
+///
+/// A message for a named locator:
+///
+/// ```
+/// Expected exactly one match for the Ship button of order 42, an AjaxLink with id "ship" in the row of Order[id=42] in OrdersPage, but found none.
+/// ```
+///
 /// ## Out of scope
 /// - acting on or asserting about components: `dev.jbaby.wicket.testkit` does that through
 ///   WicketTester
 /// - finding components by markup, CSS classes or rendered text: use `matching`
 /// - waiting or retrying; a Wicket component tree doesn't change on its own
 /// - locators aware of particular component libraries, such as Wicket Oat fields (wicket-oat)
+/// - rows of other repeaters, such as the children of a `RepeatingView` or a `Loop`: one
+///   without a model of its own takes one from a `CompoundPropertyModel` above it as soon as its
+///   model is read, which would change the page and match the wrong row; use `inside` instead
 package dev.jbaby.wicket.testkit.locator;

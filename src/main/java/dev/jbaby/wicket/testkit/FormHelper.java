@@ -1,5 +1,7 @@
 package dev.jbaby.wicket.testkit;
 
+import static dev.jbaby.wicket.testkit.WicketTestkit.className;
+import static dev.jbaby.wicket.testkit.WicketTestkit.delegate;
 import static dev.jbaby.wicket.testkit.WicketTestkit.notNull;
 import static dev.jbaby.wicket.testkit.WicketTestkit.prefix;
 import static dev.jbaby.wicket.testkit.WicketTestkit.requireAjaxBehavior;
@@ -9,6 +11,7 @@ import static java.util.stream.Collectors.joining;
 
 import dev.jbaby.wicket.testkit.locator.Locator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 import org.apache.wicket.Component;
 import org.apache.wicket.markup.html.form.AbstractChoice;
@@ -70,7 +73,7 @@ public final class FormHelper {
         requireCurrent();
         notNull(value, "value");
         var located = locateUsable(notNull(field, "field"));
-        WicketTestkit.check(field, located, () -> formTester.setValue(located, value));
+        delegate(field, located, () -> formTester.setValue(located, value));
         return this;
     }
 
@@ -94,7 +97,7 @@ public final class FormHelper {
         requireCurrent();
         var located = locateUsable(notNull(field, "field"));
         requireNoUpdatingBehavior(field, located);
-        WicketTestkit.check(field, located, () -> formTester.select(formRelativePath(located), index));
+        delegate(field, located, () -> formTester.select(formRelativePath(located), index));
         return this;
     }
 
@@ -119,8 +122,8 @@ public final class FormHelper {
         notNull(choice, "choice");
         var located = (AbstractChoice<?, ?>) locateUsable(notNull(field, "field"));
         requireNoUpdatingBehavior(field, located);
-        var index = indexOf(field, located, choice);
-        WicketTestkit.check(field, located, () -> formTester.select(formRelativePath(located), index));
+        var index = indexOf(field, located, located.getChoices(), choice);
+        delegate(field, located, () -> formTester.select(formRelativePath(located), index));
         return this;
     }
 
@@ -143,8 +146,9 @@ public final class FormHelper {
         requireCurrent();
         Stream.of(notNull(choices, "choices")).forEach(choice -> notNull(choice, "choices"));
         var located = (ListMultipleChoice<?>) locateUsable(notNull(field, "field"));
-        var indexes = Stream.of(choices).mapToInt(choice -> indexOf(field, located, choice)).toArray();
-        WicketTestkit.check(field, located,
+        var available = located.getChoices();
+        var indexes = Stream.of(choices).mapToInt(choice -> indexOf(field, located, available, choice)).toArray();
+        delegate(field, located,
             () -> formTester.selectMultiple(formRelativePath(located), indexes, true));
         return this;
     }
@@ -178,7 +182,7 @@ public final class FormHelper {
     private FormHelper setChecked(Locator<? extends CheckBox> field, boolean checked) {
         requireCurrent();
         var located = locateUsable(notNull(field, "field"));
-        WicketTestkit.check(field, located, () -> formTester.setValue(formRelativePath(located), checked));
+        delegate(field, located, () -> formTester.setValue(located, Boolean.toString(checked)));
         return this;
     }
 
@@ -200,7 +204,7 @@ public final class FormHelper {
         notNull(event, "event");
         var located = requireVisible(component, notNull(component, "component").one(form));
         requireAjaxBehavior(component, located, event);
-        WicketTestkit.check(component, located, () -> tester.executeAjaxEvent(located, event));
+        delegate(component, located, () -> tester.executeAjaxEvent(located, event));
     }
 
     /// Submits the form with the values set so far, as `FormTester.submit()` does.
@@ -210,7 +214,7 @@ public final class FormHelper {
     /// ```
     public void submit() {
         requireCurrent();
-        WicketTestkit.check(formLocator, form, formTester::submit);
+        delegate(formLocator, form, formTester::submit);
     }
 
     /// Submits the form through a button with the values set so far, as
@@ -227,7 +231,7 @@ public final class FormHelper {
     public void submit(Locator<?> button) {
         requireCurrent();
         var located = locateUsable(notNull(button, "button"));
-        WicketTestkit.check(button, located, () -> formTester.submit(located));
+        delegate(button, located, () -> formTester.submit(located));
     }
 
     /// Returns the `FormTester` behind this helper, with the values set so far, for what the
@@ -266,15 +270,19 @@ public final class FormHelper {
     }
 
     /// The index of the first of the field's choices that equals the choice.
-    private static int indexOf(Locator<?> field, AbstractChoice<?, ?> located, Object choice) {
-        var choices = located.getChoices();
+    private static int indexOf(Locator<?> field, AbstractChoice<?, ?> located, List<?> choices, Object choice) {
         for (var index = 0; index < choices.size(); index++) {
             if (choice.equals(choices.get(index))) {
                 return index;
             }
         }
-        throw new AssertionError(prefix(field, located) + "the component has no choice " + value(choice)
-            + "; its choices are " + listed(choices));
+        var types = choices.stream().filter(Objects::nonNull).map(each -> className(each.getClass())).distinct()
+            .toList();
+        var type = className(choice.getClass());
+        var choicesAre = choices.isEmpty() || types.contains(type) ? "; its choices are "
+            : " of type " + type + "; its choices, of type " + String.join(", ", types) + ", are ";
+        throw new AssertionError(prefix(field, located) + "the component has no choice " + WicketTestkit.shown(choice)
+            + choicesAre + listed(choices));
     }
 
     /// The choices separated by commas, at most `MAX_CHOICES` of them, or `none`.
@@ -282,14 +290,8 @@ public final class FormHelper {
         if (choices.isEmpty()) {
             return "none";
         }
-        var shown = choices.stream().limit(MAX_CHOICES).map(FormHelper::value).collect(joining(", "));
+        var shown = choices.stream().limit(MAX_CHOICES).map(WicketTestkit::shown).collect(joining(", "));
         return choices.size() > MAX_CHOICES ? shown + ", and " + (choices.size() - MAX_CHOICES) + " more" : shown;
-    }
-
-    /// A string in double quotes, any other value as `String.valueOf` shows it, as a locator's
-    /// description shows values.
-    private static String value(Object value) {
-        return value instanceof String ? "\"" + value + "\"" : String.valueOf(value);
     }
 
     /// The component's path relative to the form, as `FormTester` takes it.

@@ -22,8 +22,10 @@ import org.apache.wicket.Page;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.DropDownChoice;
 import org.apache.wicket.markup.html.form.TextField;
+import org.apache.wicket.markup.html.list.ListItem;
 import org.apache.wicket.markup.repeater.RepeatingView;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
@@ -179,6 +181,17 @@ class LocatorTests {
         }
 
         @Test
+        @DisplayName("R2.13 a label is read as text, without markup tags and with character entities decoded")
+        void labelsAreReadAsText() {
+            tester.startPage(OrderFormPage.class);
+            var formPage = tester.getLastRenderedPage();
+
+            assertThat(paths(locate(CheckBox.class).withLabel("Terms & conditions").all(formPage)))
+                .as("<wicket:label>Terms &amp; <b>conditions</b></wicket:label>")
+                .containsExactly("search:terms");
+        }
+
+        @Test
         @DisplayName("R2.11 a component whose label cannot be read does not match withLabel")
         void unreadableLabelsDoNotMatch() {
             var root = new WebMarkupContainer("root");
@@ -212,6 +225,15 @@ class LocatorTests {
                 .containsExactly("closed");
             assertThat(locate(Label.class).withModelObject(null).all(page)).isEmpty();
             assertThat(locate(Label.class).withModelObject(null)).hasToString("a Label with model object null");
+        }
+    }
+
+    /// A value whose `toString` throws, as an entity's may outside a database session.
+    record Exploding() implements Serializable {
+
+        @Override
+        public String toString() {
+            throw new IllegalStateException("no session");
         }
     }
 
@@ -260,6 +282,14 @@ class LocatorTests {
             assertThat(paths(locate(Label.class).inRowOf(Order.GLOBEX_42).all(page)))
                 .filteredOn(path -> path.startsWith("orders:"))
                 .containsExactly("orders:1:customer", "orders:1:number");
+
+            var root = new WebMarkupContainer("root", new CompoundPropertyModel<>(new Customer("ACME")));
+            var view = new RepeatingView("view");
+            view.add(new WebMarkupContainer("name").add(new Label("label", "text")));
+            root.add(view);
+            assertThat(locate(Label.class).inRowOf("ACME").all(root))
+                .as("a RepeatingView child is no row, though a CompoundPropertyModel would give it the model object")
+                .isEmpty();
         }
 
         @Test
@@ -281,37 +311,15 @@ class LocatorTests {
         }
 
         @Test
-        @DisplayName("R3.5 inRowOf matches only components inside a row of any other repeater whose model object equals the argument")
-        void inRowOfMatchesRowsOfOtherRepeaters() {
-            var root = new WebMarkupContainer("root");
-            var view = new RepeatingView("view");
-            for (var order : Order.ALL) {
-                var row = new WebMarkupContainer(view.newChildId(), Model.of(order));
-                view.add(row.add(new Label("customer", order.customer())));
-            }
-            root.add(view);
-
-            assertThat(paths(locate(Label.class).inRowOf(Order.GLOBEX_42).all(root)))
-                .containsExactly("view:2:customer");
-            assertThat(paths(locate(Label.class)
-                .inRowOf(Order.class, order -> order.customer().equals("ACME"), "is for ACME").all(root)))
-                .containsExactly("view:1:customer", "view:3:customer");
-        }
-
-        @Test
         @DisplayName("R3.6 a row whose model object cannot be read does not match inRowOf")
         void unreadableRowsDoNotMatch() {
             var root = new WebMarkupContainer("root");
-            var view = new RepeatingView("view");
-            view.add(new WebMarkupContainer(view.newChildId(), CombineRefinements.failingModel())
-                .add(new Label("customer", "ACME")));
-            view.add(new WebMarkupContainer(view.newChildId(), Model.of(Order.ACME_41))
-                .add(new Label("customer", "ACME")));
-            root.add(view);
+            root.add(new ListItem<>(0, CombineRefinements.failingModel()).add(new Label("customer", "ACME")));
+            root.add(new ListItem<>(1, Model.of(Order.ACME_41)).add(new Label("customer", "ACME")));
 
-            assertThat(paths(locate(Label.class).inRowOf(Order.ACME_41).all(root))).containsExactly("view:2:customer");
+            assertThat(paths(locate(Label.class).inRowOf(Order.ACME_41).all(root))).containsExactly("1:customer");
             assertThat(paths(locate(Label.class).inRowOf(Order.class, order -> true, "is any order").all(root)))
-                .containsExactly("view:2:customer");
+                .containsExactly("1:customer");
         }
     }
 
@@ -336,6 +344,8 @@ class LocatorTests {
             assertThat(title).isNotSameAs(labels);
             assertThat(paths(title.all(page))).containsExactly("title");
             assertThat(paths(labels.all(page))).contains("title", "headline", "user:name");
+            assertThat(title.named("the title")).isNotSameAs(title);
+            assertThat(title).hasToString("a Label with id \"title\"");
         }
 
         @Test
@@ -348,6 +358,8 @@ class LocatorTests {
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.withId(null)).withMessageContaining("id"),
                 () -> assertThatNullPointerException().isThrownBy(() -> labels.withLabel(null))
                     .withMessageContaining("text"),
+                () -> assertThatNullPointerException().isThrownBy(() -> labels.named(null))
+                    .withMessageContaining("name"),
                 () -> assertThatNullPointerException()
                     .isThrownBy(() -> labels.withModelObject(null, object -> true, "is anything"))
                     .withMessageContaining("modelObjectType"),
@@ -401,6 +413,24 @@ class LocatorTests {
             locate(Label.class).matching(seenWhenGivenFirst::add, "is recorded").withId("customer").all(root);
             assertThat(paths(seen)).containsExactly("customer");
             assertThat(paths(seenWhenGivenFirst)).containsExactly("customer");
+
+            var seenAfterAMiss = new ArrayList<Component>();
+            assertThatThrownBy(() -> locate(Label.class).withId("customer").withModelObject("Globex")
+                .matching(seenAfterAMiss::add, "is recorded").one(root))
+                .isInstanceOf(AssertionError.class);
+            assertThat(seenAfterAMiss)
+                .as("not after the model object missed, also not for the failure message")
+                .isEmpty();
+
+            var labelsRead = new ArrayList<String>();
+            IModel<String> recordedLabel = () -> {
+                labelsRead.add("read");
+                return "Customer";
+            };
+            root.add(new TextField<String>("field").setLabel(recordedLabel));
+            assertThatThrownBy(() -> locate(Label.class).withLabel("Customer").one(root))
+                .isInstanceOf(AssertionError.class);
+            assertThat(labelsRead).as("the label of a component of another type").isEmpty();
         }
 
         static IModel<String> failingModel() {
@@ -519,9 +549,76 @@ class LocatorTests {
         }
 
         @Test
+        @DisplayName("R6.5 a value whose toString throws appears as a or an and its class name, whose toString throws")
+        void valuesWhoseToStringThrowsAreNamed() {
+            var root = new WebMarkupContainer("root");
+            root.add(new Label("exploding", Model.of(new Exploding())));
+
+            assertThat(locate(Label.class).withModelObject(new Exploding()))
+                .hasToString("a Label with model object an Exploding whose toString throws");
+            assertThat(locate(Label.class).inRowOf(new Exploding()))
+                .hasToString("a Label in the row of an Exploding whose toString throws");
+            assertThat(FailureMessageTests.messageOf(locate(Label.class).withId("exploding").withModelObject("ACME"), root))
+                .endsWith("\n  - exploding (has model object an Exploding whose toString throws)");
+        }
+
+        @Test
         @DisplayName("R6.4 toString returns the description")
         void toStringReturnsTheDescription() {
             assertThat(locate(Label.class).withId("title").toString()).isEqualTo("a Label with id \"title\"");
+        }
+    }
+
+    @Nested
+    @DisplayName("R8 name")
+    class Name {
+
+        @Test
+        @DisplayName("R8.1 a named locator describes itself by its name, then its description")
+        void describesItselfByItsNameFirst() {
+            var refresh = locate(NoOpLink.class).withId("refresh").named("the Refresh link");
+
+            assertThat(refresh).hasToString("the Refresh link, a NoOpLink with id \"refresh\"");
+            assertThat(FailureMessageTests.messageOf(locate(Label.class).withId("missing").named("the missing label"),
+                page))
+                .startsWith("Expected exactly one match for the missing label, a Label with id \"missing\" in ShopPage,"
+                    + " but found none.");
+        }
+
+        @Test
+        @DisplayName("R8.2 inside a named locator, the description and what differs show only its name")
+        void insideANamedLocatorShowsOnlyItsName() {
+            var title = locate(Label.class).withId("title").inside(locate(UserPanel.class).named("the user panel"));
+
+            assertThat(title).hasToString("a Label with id \"title\" inside the user panel");
+            assertThat(FailureMessageTests.messageOf(title, page))
+                .endsWith("\n  - title (is not inside the user panel)\n  - user:name (has id \"name\")");
+        }
+
+        @Test
+        @DisplayName("R8.3 refining a named locator returns a locator without the name")
+        void refiningDropsTheName() {
+            var refresh = locate(NoOpLink.class).withId("refresh").named("the Refresh link");
+
+            assertThat(refresh.enabled()).hasToString("an enabled NoOpLink with id \"refresh\"");
+        }
+
+        @Test
+        @DisplayName("R8.4 a named locator matches the same components as without the name")
+        void namingChangesNoMatch() {
+            var customers = locate(Label.class).withId("customer");
+
+            assertThat(customers.named("the customers").all(page)).containsExactlyElementsOf(customers.all(page));
+            assertThat(customers.named("the customers").existsIn(page)).isTrue();
+        }
+
+        @Test
+        @DisplayName("R8.5 named with a blank name throws an IllegalArgumentException")
+        void blankNamesAreRejected() {
+            var labels = locate(Label.class);
+
+            assertThatIllegalArgumentException().isThrownBy(() -> labels.named(""));
+            assertThatIllegalArgumentException().isThrownBy(() -> labels.named("  "));
         }
     }
 }

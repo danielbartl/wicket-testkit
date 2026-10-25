@@ -6,7 +6,8 @@ import java.util.regex.Pattern;
 import org.apache.wicket.Component;
 import org.apache.wicket.MarkupContainer;
 import org.apache.wicket.markup.html.form.ILabelProvider;
-import org.apache.wicket.markup.repeater.AbstractRepeater;
+import org.apache.wicket.markup.html.list.ListItem;
+import org.apache.wicket.util.string.Strings;
 
 /// One refinement of a locator: a condition a component has to meet besides the locator's type.
 sealed interface Criterion {
@@ -23,8 +24,9 @@ sealed interface Criterion {
     /// Where a near miss of this criterion goes in a failure message; the type comes first, at 0.
     int nearMissOrder();
 
-    /// Whether this criterion may be tested only for components of the locator's type, because
-    /// it reads the model object or runs the caller's predicate.
+    /// Whether this criterion may be tested only for components of the locator's type, and only
+    /// once they met every other criterion, because it reads the model object or label, or runs
+    /// the caller's predicate.
     default boolean needsType() {
         return false;
     }
@@ -32,7 +34,7 @@ sealed interface Criterion {
     /// Whether the component is inside a row whose model object can be read and is accepted.
     private static boolean inRow(Component component, Predicate<Object> element) {
         for (MarkupContainer parent = component.getParent(); parent != null; parent = parent.getParent()) {
-            if (parent.getParent() instanceof AbstractRepeater) {
+            if (parent instanceof ListItem) {
                 var modelObject = ModelObject.read(parent);
                 if (modelObject != ModelObject.UNREADABLE && element.test(modelObject)) {
                     return true;
@@ -102,7 +104,7 @@ sealed interface Criterion {
 
         @Override
         public String phrase() {
-            return "inside " + ancestor;
+            return "inside " + ancestor.nameOrDescription();
         }
 
         @Override
@@ -116,8 +118,9 @@ sealed interface Criterion {
         }
     }
 
-    /// A row is a direct child of a repeater: a `ListItem` of a `ListView`, an `Item` of a
-    /// `RefreshingView`, or any child of a `RepeatingView`.
+    /// A row is a `ListItem`; `Item`, which `RefreshingView` renders, extends it. Other children of
+    /// repeaters are not rows: reading the model of one without a model of its own would give it
+    /// one from a `CompoundPropertyModel` above it.
     record InRowOf(Object element) implements Criterion {
 
         @Override
@@ -298,17 +301,23 @@ sealed interface Criterion {
     }
 
     /// A component that provides no label, or a label model whose object is `null`, has no label.
-    record LabelText(String text) implements Criterion {
+    /// The searched text is the given one, normalized once.
+    record LabelText(String text, String searched) implements Criterion {
 
         private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+        private static final Pattern TAG = Pattern.compile("<[^>]*>");
 
         /// Stands for a label that could not be read.
         private static final Object UNREADABLE = new Object();
 
+        static LabelText of(String text) {
+            return new LabelText(text, normalized(text));
+        }
+
         @Override
         public boolean test(Component component) {
             var actual = read(component);
-            return actual != UNREADABLE && normalized(text).equals(actual);
+            return actual != UNREADABLE && searched.equals(actual);
         }
 
         @Override
@@ -323,8 +332,8 @@ sealed interface Criterion {
                 : actual == null ? "has no label" : "has label " + Words.value(actual);
         }
 
-        /// The component's label with its whitespace normalized, `null` if it has none, or
-        /// `UNREADABLE` if reading it throws.
+        /// The component's label as text, without tags, with entities decoded and with its whitespace
+        /// normalized; `null` if it has none, or `UNREADABLE` if reading it throws.
         private static Object read(Component component) {
             if (!(component instanceof ILabelProvider<?> provider)) {
                 return null;
@@ -332,7 +341,8 @@ sealed interface Criterion {
             try {
                 var label = provider.getLabel();
                 var object = label == null ? null : label.getObject();
-                return object == null ? null : normalized(String.valueOf(object));
+                return object == null ? null
+                    : normalized(Strings.unescapeMarkup(TAG.matcher(String.valueOf(object)).replaceAll("")).toString());
             } catch (RuntimeException e) {
                 return UNREADABLE;
             }
@@ -346,6 +356,11 @@ sealed interface Criterion {
         @Override
         public int nearMissOrder() {
             return 8;
+        }
+
+        @Override
+        public boolean needsType() {
+            return true;
         }
     }
 }

@@ -57,6 +57,7 @@ import org.apache.wicket.model.util.ListModel;
 /// shipping         Label "Shipping to <country>"
 /// search           Form
 ///   query          TextField, labelled "Search term" by a <wicket:label> spread over lines
+///   terms          CheckBox, labelled by the <wicket:label> "Terms &amp; <b>conditions</b>"
 /// hidden           Form, invisible
 /// ```
 ///
@@ -80,6 +81,7 @@ public class OrderFormPage extends WebPage {
     private String gift;
     private String result = "not submitted";
     private String query;
+    private boolean terms;
 
     public OrderFormPage() {
         IModel<String> resultModel = () -> result;
@@ -154,6 +156,7 @@ public class OrderFormPage extends WebPage {
 
         var search = new Form<Void>("search");
         search.add(new TextField<>("query", PropertyModel.<String>of(this, "query")));
+        search.add(new CheckBox("terms", PropertyModel.of(this, "terms")));
         add(search);
 
         var hidden = new Form<Void>("hidden");
