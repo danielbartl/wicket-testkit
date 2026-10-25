@@ -1,0 +1,13 @@
+{
+  "name": "wicket-testkit",
+  "description": "Test Apache Wicket pages with wicket-testkit: locate components by type, wicket:id, label, model object and row instead of WicketTester paths, fill in forms, compare rows with example tables, and read its failure messages.",
+  "version": "0.2.0",
+  "author": {
+    "name": "Daniel Bartl",
+    "url": "https://github.com/danielbartl"
+  },
+  "homepage": "https://danielbartl.github.io/wicket-testkit/",
+  "repository": "https://github.com/danielbartl/wicket-testkit",
+  "license": "Apache-2.0",
+  "keywords": ["java", "wicket", "testing", "wickettester", "page-objects"]
+}
