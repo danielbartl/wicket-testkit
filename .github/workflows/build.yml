@@ -39,3 +39,36 @@ jobs:
         with:
           name: test-reports-java-${{ matrix.java }}
           path: target/surefire-reports/
+
+  wicket-11:
+    # The jar is built for Wicket 10 and Java 17, as released; this runs the tests against that jar
+    # with Wicket 11 on the classpath (see compat/wicket-11/pom.xml). Wicket 11 needs Java 21.
+    name: Wicket 11 on Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['21', '25']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Build and install the jar
+        run: ./mvnw -B -ntp install -DskipTests -Dmaven.javadoc.skip=true
+
+      - name: Test the jar on Wicket 11
+        run: |
+          version=$(./mvnw -B -ntp -q help:evaluate -Dexpression=project.version -DforceStdout)
+          ./mvnw -B -ntp -f compat/wicket-11 verify -Dtestkit.version="$version"
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-wicket-11-java-${{ matrix.java }}
+          path: compat/wicket-11/target/surefire-reports/

@@ -30,10 +30,14 @@ import org.junit.jupiter.api.TestFactory;
 ///
 /// Tests belong to the spec of their own package only, not to a parent package's: the tests in
 /// `locator` prove the `locator` spec, and both specs number their requirements from R1.
+///
+/// The sources are read relative to the working directory, or to the directory in the system
+/// property `wicket.testkit.basedir`, which the Wicket 11 check in `compat/wicket-11` sets.
 class SpecTraceabilityTests {
 
-    static final Path MAIN = Path.of("src/main/java");
-    static final Path TEST = Path.of("src/test/java");
+    static final Path BASE = Path.of(System.getProperty("wicket.testkit.basedir", ""));
+    static final Path MAIN = BASE.resolve("src/main/java");
+    static final Path TEST = BASE.resolve("src/test/java");
 
     static final Pattern REQUIREMENT = Pattern.compile(
         "^\\s*///\\s*-\\s*(R\\d+\\.\\d+)\\b", Pattern.MULTILINE);

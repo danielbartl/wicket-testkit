@@ -25,8 +25,9 @@ kit.click(locate(AjaxLink.class).withId("ship").inRowOf(order));
 
 ## Installation
 
-Add it in test scope. It needs Wicket 10 and Java 17 or newer, and uses the `wicket-core` and
-`wicket-tester` your project already has, so your Wicket version wins.
+Add it in test scope. It works with Wicket 10 on Java 17 or newer and with Wicket 11 on Java 21 or
+newer, and uses the `wicket-core` and `wicket-tester` your project already has, so your Wicket
+version wins.
 
 ```xml
 <dependency>
@@ -314,7 +315,7 @@ Name the locators in a page object with `named`, and failures speak the domain's
 - **`WicketTester`, not `BaseWicketTester`.** The assertions exist only on `WicketTester`.
 - **Plain articles.** Descriptions put `an` before any vowel letter, so a `UserPanel` comes out as
   `an UserPanel`.
-- **Wicket 10 only.** Wicket 9 and older are not supported; Wicket 11 will follow.
+- **Wicket 10 and 11.** Wicket 9 and older are not supported.
 
 ## Building
 
@@ -328,6 +329,17 @@ compiles with `--release 17` and builds on JDK 25:
 Each package's spec lives in its `package-info.java`, as EARS requirements with ids like `R2.3`.
 Every requirement has a test whose `@DisplayName` starts with its id, and `SpecTraceabilityTests`
 fails the build on any gap.
+
+The jar is built against Wicket 10, and Wicket 11 projects use that same jar. To check it on
+Wicket 11, run the tests against the installed jar with Wicket 11 on the classpath (JDK 21 or
+newer):
+
+```sh
+./mvnw install -DskipTests
+./mvnw -f compat/wicket-11 verify -Dtestkit.version=0.2.1-SNAPSHOT
+```
+
+CI runs both builds on every push.
 
 ## Credits
 

@@ -5,7 +5,7 @@ description: Write, fix and refactor tests for Apache Wicket pages, panels and f
 
 # wicket-testkit
 
-wicket-testkit (`dev.jbaby:wicket-testkit`, test scope, Wicket 10, Java 17+) wraps the
+wicket-testkit (`dev.jbaby:wicket-testkit`, test scope, Wicket 10 on Java 17+ or Wicket 11 on Java 21+) wraps the
 `WicketTester` a test already has. A `Locator` describes a component by what it is; every action
 and assertion resolves it against the last rendered page to exactly one component and then calls
 the WicketTester or FormTester method that does the job. Wicket's behaviour stays as it is, and

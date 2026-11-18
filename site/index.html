@@ -6,7 +6,7 @@
 <title>wicket-testkit</title>
 <meta name="description" content="Readable, refactoring-proof Apache Wicket tests: locate components by type, wicket:id, model object and row instead of string paths, then act and assert through your own WicketTester.">
 <meta property="og:title" content="wicket-testkit">
-<meta property="og:description" content="Find Wicket components by what they are, not where they sit. Test helpers for WicketTester on Wicket 10.">
+<meta property="og:description" content="Find Wicket components by what they are, not where they sit. Test helpers for WicketTester on Wicket 10 and 11.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314181F'/%3E%3Cpath d='M8 13V8h5M19 8h5v5M24 19v5h-5M13 24H8v-5' fill='none' stroke='%233DDC97' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%23E8ECF1'/%3E%3C/svg%3E">
 <script>try { var t = localStorage.getItem("wicket-testkit-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
@@ -216,7 +216,7 @@ section { padding-block: clamp(3rem, 7vw, 5.5rem); border-top: 1px solid var(--r
   <div class="hero">
     <div class="wrap">
       <div>
-        <p class="eyebrow">Test kit for Apache Wicket 10</p>
+        <p class="eyebrow">Test kit for Apache Wicket 10 and 11</p>
         <h1>Find components by <span class="target">what they are</span><span class="quiet">not where they sit.</span></h1>
         <p class="lede">WicketTester finds components by paths like <code>orders:1:customer</code>. Wrap a container
           around them or sort a list, and the test breaks, or checks the wrong row. <strong>wicket-testkit locates
@@ -227,7 +227,7 @@ section { padding-block: clamp(3rem, 7vw, 5.5rem); border-top: 1px solid var(--r
           <a class="btn ghost" href="https://github.com/danielbartl/wicket-testkit">View on GitHub</a>
         </div>
         <ul class="facts">
-          <li>Wicket 10</li>
+          <li>Wicket 10 and 11</li>
           <li>Java 17+</li>
           <li>test scope</li>
           <li>no extra dependencies</li>
@@ -498,7 +498,7 @@ but was:
         <p class="eyebrow">Install</p>
         <h2 id="install-title">One test dependency.</h2>
         <p>wicket-testkit uses the <code>wicket-core</code> and <code>wicket-tester</code> your project already has,
-          so your Wicket version wins. Wicket 10, Java 17 or newer.</p>
+          so your Wicket version wins. Wicket 10 on Java 17 or newer, or Wicket 11 on Java 21 or newer.</p>
         <p class="status-note">Latest release: 0.2.0, on
           <a href="https://central.sonatype.com/artifact/dev.jbaby/wicket-testkit">Maven Central</a>.</p>
       </div>
@@ -568,7 +568,7 @@ class OrdersPageTest {
           own <code>visitChildren</code>.</li>
         <li><strong>A component under test.</strong> After <code>startComponentInPage</code>, everything inside the
           component can be located, but not the component itself.</li>
-        <li><strong>Wicket 10.</strong> Wicket 9 and older are not supported; Wicket 11 will follow.</li>
+        <li><strong>Wicket 10 and 11.</strong> Wicket 9 and older are not supported.</li>
       </ul>
       <p class="demo-note">All the details, and the reasons, are in the <a href="guide.html#limits">user guide</a>.</p>
     </div>
@@ -579,7 +579,7 @@ class OrdersPageTest {
   <div class="wrap">
     <div>
       <h2>wicket-testkit</h2>
-      <p>Test helpers for Apache Wicket 10. Apache License 2.0.</p>
+      <p>Test helpers for Apache Wicket 10 and 11. Apache License 2.0.</p>
       <p><code>dev.jbaby:wicket-testkit</code></p>
     </div>
     <div>
